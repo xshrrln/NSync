@@ -39,7 +39,7 @@ class GoogleAuthController extends Controller
             $tenant = \App\Models\Tenant::create([
                 'name' => $user->name . ' Workspace',
                 'domain' => str($user->email)->before('@')->slug(),
-'database' => str($user->email)->before('@')->slug(),
+                'database' => str($user->email)->before('@')->slug(),
                 'plan' => 'free',
                 'status' => 'approved',
             ]);

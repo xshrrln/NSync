@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TenantController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Volt;
@@ -36,6 +37,6 @@ Route::middleware(['auth', 'verified', 'role:Platform Administrator', 'tenant'])
 });
 
 Route::get('/auth/google', [App\Http\Controllers\GoogleAuthController::class, 'redirectToGoogle'])->name('google.redirect')->withoutMiddleware([\App\Http\Middleware\IdentifyTenant::class]);
-Route::get('/auth/google/callback', [App\Http\Controllers\GoogleAuthController::class, 'handleGoogleCallback'])->name('google.callback')->withoutMiddleware([\App\Http\Middleware\IdentifyTenant::class]);
+Route::get('/auth/google/callback', [App\Http\Controllers\GoogleAuthController::class, 'handleGoogleCallback'])->name('google.callback')->withoutMiddleware([\App\Http\Middleware\IdentifyTenant::class, \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 require __DIR__.'/auth.php';
