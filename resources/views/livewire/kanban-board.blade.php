@@ -173,16 +173,24 @@ new class extends Component {
                 ->get();
         }
 
+        $boardMessages = collect();
+        try {
+            $boardMessages = Message::forRoom($this->boardId)
+                ->with('sender')
+                ->orderBy('id')
+                ->get()
+                ->values();
+        } catch (\Throwable $e) {
+            Log::warning('Unable to load board messages.', [
+                'board_id' => $this->boardId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return [
             'boardName' => $this->boardName,
             'boardSlugValue' => $this->boardSlugValue,
-            'boardMessages' => Message::forRoom($this->boardId)
-                ->with('sender')
-                ->latest()
-                ->take(40)
-                ->get()
-                ->reverse()
-                ->values(),
+            'boardMessages' => $boardMessages,
             'stages' => $this->isCapstoneTracker
                 ? collect()
                 : Stage::where('board_id', $this->boardId)
@@ -228,6 +236,11 @@ new class extends Component {
             return;
         }
 
+        if (mb_strlen($message) > 1000) {
+            $this->dispatch('notify', message: 'Message is too long. Please keep it under 1000 characters.', type: 'error');
+            return;
+        }
+
         $tenant = app('currentTenant');
         if (! $tenant) {
             $this->dispatch('notify', message: 'No active tenant workspace found.', type: 'error');
@@ -240,14 +253,25 @@ new class extends Component {
             return;
         }
 
-        Message::create([
-            'room_id' => $this->boardId,
-            'sender_id' => $tenantUserId,
-            'message' => $message,
-        ]);
+        try {
+            Message::create([
+                'room_id' => $this->boardId,
+                'sender_id' => $tenantUserId,
+                'message' => $message,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to save board message.', [
+                'board_id' => $this->boardId,
+                'sender_id' => $tenantUserId,
+                'error' => $e->getMessage(),
+            ]);
+            $this->dispatch('notify', message: 'Unable to send message right now. Please try again.', type: 'error');
+            return;
+        }
 
         $this->newBoardMessage = '';
         $this->dispatch('notify', message: 'Message sent.', type: 'success');
+        $this->dispatch('board-message-sent');
     }
 
     public function syncCapstoneTasks($tasks): void
@@ -1135,15 +1159,16 @@ new class extends Component {
         @endif
     @endif
 
-    <div class="fixed bottom-6 right-6 z-40">
+    <div class="fixed z-[90]" style="right: 1.5rem; bottom: calc(env(safe-area-inset-bottom, 0px) + 1.5rem);" x-on:board-message-sent.window="chatOpen = true; $nextTick(() => scrollChatToBottom())">
         <button
             type="button"
+            x-show="!chatOpen"
             @click="chatOpen = true; $nextTick(() => scrollChatToBottom())"
-            class="group flex h-14 w-14 items-center justify-center rounded-full text-white shadow-xl transition hover:scale-105 hover:shadow-2xl"
-            style="background: linear-gradient(135deg, color-mix(in srgb, var(--tenant-primary) 92%, white 8%), color-mix(in srgb, var(--tenant-primary) 78%, black 22%));"
+            class="group inline-flex items-center justify-center rounded-full text-white shadow-xl transition hover:scale-105 hover:shadow-2xl"
+            style="width: 3rem; height: 3rem; min-width: 3rem; min-height: 3rem; border-radius: 9999px; background: linear-gradient(135deg, color-mix(in srgb, var(--tenant-primary) 92%, white 8%), color-mix(in srgb, var(--tenant-primary) 78%, black 22%));"
             aria-label="Open board messages"
         >
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h8m-8 4h6m8-2a8 8 0 11-16 0 8 8 0 0116 0z"/>
             </svg>
         </button>
@@ -1152,61 +1177,80 @@ new class extends Component {
             x-show="chatOpen"
             x-cloak
             x-transition.origin.bottom.right
-            class="w-[22rem] overflow-hidden rounded-3xl border border-violet-200 bg-white shadow-2xl md:w-[24rem]"
+            class="relative overflow-hidden rounded-3xl border border-nsync-green-200 bg-white shadow-2xl"
+            style="width: min(34rem, calc(100vw - 2rem)); height: clamp(24rem, 58vh, 34rem);"
         >
-            <div class="flex items-center justify-between bg-violet-500 px-4 py-3 text-white">
-                <div class="min-w-0">
-                    <p class="truncate text-sm font-bold">Board Messages</p>
-                    <p class="truncate text-xs text-violet-100">{{ $boardName }}</p>
+            <div class="flex h-full flex-col">
+            <div class="px-4 py-2 text-white" style="background: linear-gradient(135deg, color-mix(in srgb, var(--tenant-primary) 92%, white 8%), color-mix(in srgb, var(--tenant-primary) 78%, black 22%)); min-height: 3rem;">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/50 bg-white/20 text-xs font-black uppercase text-white">
+                                {{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr((string) ($tenant?->name ?? 'NSync'), 0, 1)) }}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-black">{{ $tenant?->name ?? 'NSync' }}</p>
+                                <p class="truncate text-xs text-emerald-100">Board Messages | {{ $boardName }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        @click="chatOpen = false"
+                        class="shrink-0 rounded-full bg-white/15 p-1.5 text-emerald-100 hover:bg-white/25 hover:text-white"
+                        aria-label="Close board messages"
+                    >
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
                 </div>
-                <button
-                    type="button"
-                    @click="chatOpen = false"
-                    class="rounded-lg p-1.5 text-violet-100 hover:bg-white/20 hover:text-white"
-                    aria-label="Close board messages"
-                >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
             </div>
 
-            <div x-ref="chatThread" class="max-h-[24rem] space-y-3 overflow-y-auto bg-gradient-to-b from-violet-50 to-white px-4 py-4">
+            <div x-ref="chatThread" class="flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-nsync-green-50 to-white px-4 py-2.5" style="min-height: 0;">
                 @forelse($boardMessages as $message)
-                    <div class="flex {{ $message->sender?->email === auth()->user()->email ? 'justify-end' : 'justify-start' }}">
-                        <div class="max-w-[16rem] rounded-2xl px-3.5 py-2.5 {{ $message->sender?->email === auth()->user()->email ? 'bg-violet-600 text-white' : 'bg-white text-slate-900 border border-violet-100' }}">
+                    @php $isOwnMessage = $message->sender?->email === auth()->user()->email; @endphp
+                    <div class="flex {{ $isOwnMessage ? 'justify-end' : 'justify-start' }}">
+                        <div
+                            class="max-w-[18rem] px-4 py-2.5 {{ $isOwnMessage ? 'text-slate-900' : 'bg-slate-100 text-slate-900 border border-slate-200' }}"
+                            style="border-radius: 9999px; @if($isOwnMessage) background-color: color-mix(in srgb, var(--tenant-primary) 20%, #d1d5db 80%); @endif"
+                        >
                             <p class="text-sm leading-5">{{ $message->message }}</p>
-                            <p class="mt-1 text-[11px] {{ $message->sender?->email === auth()->user()->email ? 'text-violet-100' : 'text-slate-500' }}">
-                                {{ $message->sender?->name ?? 'Teammate' }} • {{ $message->created_at->diffForHumans() }}
+                            <p class="mt-1 text-[11px] text-slate-600">
+                                {{ $message->sender?->name ?? 'Teammate' }} | {{ $message->created_at->diffForHumans() }}
                             </p>
                         </div>
                     </div>
                 @empty
-                    <div class="rounded-2xl border border-dashed border-violet-200 bg-white/80 px-4 py-8 text-center">
+                    <div class="rounded-2xl border border-dashed border-nsync-green-200 bg-white/80 px-4 py-8 text-center">
                         <p class="text-sm font-semibold text-slate-700">No messages yet</p>
                         <p class="mt-1 text-xs text-slate-500">Open the chat and start the board conversation.</p>
                     </div>
                 @endforelse
             </div>
 
-            <div class="border-t border-violet-100 bg-white px-4 py-3">
+            <div class="sticky bottom-0 border-t border-nsync-green-100 bg-white px-4 pt-2 pb-1" style="min-height: 3rem;">
                 <div class="flex items-center gap-2">
                     <input
                         type="text"
                         wire:model="newBoardMessage"
                         wire:keydown.enter.prevent="sendBoardMessage"
                         @keydown.enter="$nextTick(() => scrollChatToBottom())"
+                        maxlength="1000"
                         placeholder="Type a message..."
-                        class="flex-1 rounded-full border border-violet-200 px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-violet-400"
+                        class="flex-1 rounded-full border border-nsync-green-200 px-4 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-nsync-green-300"
                     >
                     <button
                         wire:click="sendBoardMessage"
                         @click="$nextTick(() => scrollChatToBottom())"
-                        class="rounded-full bg-violet-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700"
+                        type="button"
+                        aria-label="Send message"
+                        class="inline-flex shrink-0 items-center justify-center rounded-full bg-nsync-green-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-nsync-green-700"
                     >
                         Send
                     </button>
                 </div>
+            </div>
             </div>
         </div>
     </div>
@@ -1298,6 +1342,28 @@ new class extends Component {
         return {
             draggedTaskId: null,
             chatOpen: false,
+
+            init() {
+                this.$watch('chatOpen', (value) => {
+                    if (value) {
+                        this.$nextTick(() => this.scrollChatToBottom());
+                    }
+                });
+
+                const autoScroll = () => {
+                    if (this.chatOpen) {
+                        this.$nextTick(() => this.scrollChatToBottom());
+                    }
+                };
+
+                if (window.Livewire && typeof window.Livewire.hook === 'function') {
+                    try {
+                        window.Livewire.hook('message.processed', autoScroll);
+                    } catch (error) {
+                        // Livewire hook name differs by version; ignore safely.
+                    }
+                }
+            },
 
             scrollChatToBottom() {
                 const thread = this.$refs.chatThread;
@@ -1543,6 +1609,7 @@ new class extends Component {
         }
     }
 </style>
+
 
 
 
