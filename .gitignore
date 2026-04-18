@@ -22,3 +22,10 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local planning / scratch files (never commit)
+TODO*.md
+todo*.md
+_repo_export_nsync/
+hasRole('Platform
+

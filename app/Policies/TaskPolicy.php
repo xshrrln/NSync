@@ -20,22 +20,55 @@ class TaskPolicy
 
     public function create(User $user): bool
     {
-        return $user->tenant_id !== null;
+        $tenant = app()->has('currentTenant') ? app('currentTenant') : $user->tenant;
+
+        return $user->tenant_id !== null
+            && $tenant
+            && ! $tenant->requiresSubscriptionRenewal();
     }
 
     public function update(User $user, Task $task): bool
     {
-        return $user->tenant_id === $task->tenant_id;
+        $tenant = app()->has('currentTenant') ? app('currentTenant') : $user->tenant;
+
+        return $user->tenant_id === $task->tenant_id
+            && $tenant
+            && ! $tenant->requiresSubscriptionRenewal();
     }
 
     public function delete(User $user, Task $task): bool
     {
-        return $user->tenant_id === $task->tenant_id && ($user->hasRole('Team Supervisor') || $task->user_id === $user->id);
+        $tenant = app()->has('currentTenant') ? app('currentTenant') : $user->tenant;
+
+        return $user->tenant_id === $task->tenant_id
+            && $tenant
+            && ! $tenant->requiresSubscriptionRenewal()
+            && ($user->hasRole('Team Supervisor') || $task->user_id === $user->id);
     }
 
     public function move(User $user, Task $task): bool
     {
-        return $this->update($user, $task);
+        $tenant = app()->has('currentTenant') ? app('currentTenant') : $user->tenant;
+
+        return $user->tenant_id === $task->tenant_id
+            && $tenant
+            && ! $tenant->requiresSubscriptionRenewal(); // All members can move cards
+    }
+
+    public function invite(User $user): bool
+    {
+        $tenant = app()->has('currentTenant') ? app('currentTenant') : $user->tenant;
+        return $tenant
+            && ! $tenant->requiresSubscriptionRenewal()
+            && $tenant->hasFeature('member-invites')
+            && $user->hasRole('Team Supervisor');
+    }
+
+    public function billing(User $user): bool
+    {
+        $tenant = app('currentTenant') ?? $user->tenant;
+        return $tenant
+            && ($user->hasRole('Team Supervisor') || $tenant->hasFeature('advanced-reporting'));
     }
 }
 

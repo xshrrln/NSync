@@ -28,12 +28,14 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-'google' => [
+    'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
-        'redirect' => env('GOOGLE_REDIRECT_URI', 'http://localhost:8000/auth/google/callback'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL', 'http://localhost') . '/auth/google/callback'),
         'guzzle' => [
-            'verify' => base_path('cacert.pem'),
+            'verify' => env('GOOGLE_OAUTH_CA_BUNDLE')
+                ? base_path(env('GOOGLE_OAUTH_CA_BUNDLE'))
+                : env('GOOGLE_OAUTH_VERIFY_SSL', true),
         ],
     ],
 

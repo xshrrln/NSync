@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class RegisteredUserController extends Controller
@@ -26,40 +26,55 @@ class RegisteredUserController extends Controller
     /**
      * Handle an incoming registration request.
      *
-     * @throws ValidationException
+     * @throws \Illuminate\Validation\ValidationException
      */
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:'.User::class],
+            'organization' => ['required', 'string', 'max:255'],
+            'address' => ['required', 'string', 'max:500'],
         ]);
-
-        $request->flash(); // Keep form data on validation error
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'password' => Hash::make(Str::random(12)),
         ]);
 
-        // Create pending tenant for new user
-        $tenant = \App\Models\Tenant::create([
-            'name' => $request->name . ' Workspace',
-            'domain' => str($request->email)->before('@')->slug(),
-            'database' => 'tenant_' . str($request->email)->before('@')->slug(),
+        $domain = Str::slug($request->organization) . '.localhost';
+        $database = Str::slug($request->organization) . '_db';
+
+        $tenant = Tenant::create([
+            'organization' => $request->organization,
+            'name' => $request->organization,
+            'address' => $request->address,
+            'tenant_admin' => $request->name,
+            'tenant_admin_email' => $request->email,
+            'domain' => $domain,
+            'database' => $database,
             'plan' => 'free',
             'status' => 'pending',
         ]);
 
         $user->update(['tenant_id' => $tenant->id]);
-        $user->assignRole('Team Supervisor'); // Owner role
+        $user->assignRole('Team Supervisor');
+
+        // Dispatch tenant database creation
+        \Bus::dispatch(new \App\Jobs\CreateTenantDatabase($tenant, [
+            'name' => $user->name,
+            'email' => $user->email,
+            'password' => $user->password,
+            'role' => 'admin',
+            'tenant_id' => $tenant->id,
+        ]));
 
         event(new Registered($user));
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        return redirect(route('pending-approval', $tenant->id));
     }
 }
+

@@ -4,16 +4,32 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
+use Spatie\Multitenancy\Models\Concerns\UsesTenantConnection;
 
 class Board extends Model
 {
-protected $fillable = ['tenant_id', 'name', 'slug', 'starred_by', 'members'];
+    use UsesTenantConnection;
+
+    protected $connection = 'tenant';
+
+    protected $fillable = ['tenant_id', 'name', 'slug', 'starred_by', 'members'];
+
+    protected $casts = [
+        'name' => 'encrypted',
+        'starred_by' => 'array',
+        'members' => 'encrypted:array',
+    ];
 
     protected static function booted()
     {
         static::addGlobalScope('tenant', function ($builder) {
             $tenant = app()->has('currentTenant') ? app('currentTenant') : null;
-            if ($tenant) {
+            $connection = $builder->getQuery()->getConnection()->getName();
+            $table = $builder->getModel()->getTable();
+            $hasTenantId = Schema::connection($connection)->hasColumn($table, 'tenant_id');
+
+            if ($tenant && $hasTenantId) {
                 $builder->where('tenant_id', $tenant->id);
             }
         });

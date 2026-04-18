@@ -16,7 +16,7 @@ new class extends Component {
     <div class="bg-white shadow-xl rounded-2xl p-8">
         <h2 class="text-3xl font-bold text-gray-900 mb-8">Pending Workspace Approvals</h2>
         
-        @if(Tenant::where('status', 'pending')->count() === 0)
+@if($tenants->where('status', 'pending')->count() === 0)
             <div class="text-center py-12">
                 <div class="w-20 h-20 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -28,7 +28,39 @@ new class extends Component {
             </div>
         @else
             <div class="grid gap-6">
-                @foreach(Tenant::where('status', 'pending')->with('users')->get() as $tenant)
+@foreach($tenants as $tenant)
+    <tr class="border-b border-gray-200 hover:bg-gray-50">
+        <td class="p-4 font-medium text-gray-900">{{ $tenant->name }}</td>
+        <td class="p-4 text-gray-600">{{ $tenant->tenant_admin ?? 'N/A' }}</td>
+text-base text-gray-500">{{ $tenant->tenant_admin_email }}</td>
+        <td class="p-4">
+text-{{ $tenant->status === 'approved' ? 'green' : 'yellow' }}-800 text-sm font-medium rounded-full">
+                {{ ucfirst($tenant->status) }}
+            </span>
+        </td>
+text-base font-medium">{{ $tenant->member_count }} members</td>
+</xai:function_call >
+
+<xai:function_call name="edit_file">
+<parameter name="path">resources/views/components/admin/⚡tenant-approval.blade.php
+        <td class="p-4 text-sm text-gray-500">{{ number_format($tenant->storage_used, 1) }} MB</td>
+        <td class="p-4 text-sm font-medium">{{ $tenant->plan }}</td>
+        <td class="p-4 text-right">
+            <form method="POST" action="{{ route('admin.tenants.approve', $tenant) }}" class="inline">
+                @csrf @method('PATCH')
+                <button type="submit" class="text-green-600 hover:text-green-900 font-medium">Approve</button>
+            </form>
+            <a href="#" class="text-gray-600 hover:text-gray-900 ml-4 font-medium">View</a>
+        </td>
+    </tr>
+@endforeach
+<tfoot>
+    <tr>
+        <td colspan="8">
+            {{ $tenants->links() }}
+        </td>
+    </tr>
+</tfoot>
                     <div class="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all">
                         <div class="flex items-start justify-between mb-4">
                             <div>

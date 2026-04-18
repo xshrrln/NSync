@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('boards', function (Blueprint $table) {
-            $table->json('starred_by')->nullable()->after('slug');
-            $table->json('members')->nullable()->after('starred_by');
+            if (!Schema::hasColumn('boards', 'starred_by')) {
+                $table->json('starred_by')->nullable()->after('slug');
+            }
+            if (!Schema::hasColumn('boards', 'members')) {
+                $table->json('members')->nullable()->after('starred_by');
+            }
         });
     }
 

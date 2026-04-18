@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Traits\HasRoles; 
 
 class User extends Authenticatable
@@ -26,6 +27,7 @@ class User extends Authenticatable
         'password',
         'tenant_id',
         'avatar',
+        'google_id',
     ];
 
 
@@ -34,7 +36,11 @@ class User extends Authenticatable
     {
         static::addGlobalScope('tenant', function ($builder) {
             $tenant = app()->has('currentTenant') ? app('currentTenant') : null;
-            if ($tenant) {
+            $connection = $builder->getQuery()->getConnection()->getName();
+            $table = $builder->getModel()->getTable();
+            $hasTenantId = Schema::connection($connection)->hasColumn($table, 'tenant_id');
+
+            if ($tenant && $hasTenantId) {
                 $builder->where('tenant_id', $tenant->id);
             }
         });
@@ -75,8 +81,11 @@ class User extends Authenticatable
         return $this->hasMany(Task::class);
     }
 
-    public function tenants()
+    /**
+     * Check if this user belongs to a specific tenant.
+     */
+    public function belongsToTenant(Tenant $tenant): bool
     {
-        return $this->belongsToMany(Tenant::class, 'tenant_users')->withPivot('role');
+        return $this->tenant_id === $tenant->id;
     }
 }

@@ -25,10 +25,16 @@ class TenantPolicy
 
     public function update(User $user, Tenant $tenant): bool
     {
-        return $user->tenant_id === $tenant->id && $user->hasRole('Team Supervisor');
+        return $user->hasRole('Platform Administrator') ||
+            ($user->tenant_id === $tenant->id && $user->hasRole('Team Supervisor'));
     }
 
     public function approve(User $user, Tenant $tenant): bool
+    {
+        return $user->hasRole('Platform Administrator');
+    }
+
+    public function suspend(User $user, Tenant $tenant): bool
     {
         return $user->hasRole('Platform Administrator');
     }

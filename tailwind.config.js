@@ -14,15 +14,20 @@ export default {
 
     theme: {
         extend: {
-            fontFamily: {
+fontFamily: {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
             },
+            fontSize: {
+                'base': '1rem',
+                'sm': '0.938rem',
+            },
             colors: {
-                // NSync Brand Colors
-                'nsync-blue': {
-                    500: '#3b82f6',
-                    600: '#2563eb',
-                    700: '#1d4ed8',
+// NSync Brand Colors - White + Green theme
+                'nsync-green': {
+                    400: '#4ade80',
+                    500: '#22c55e',
+                    600: '#16a34a',
+                    700: '#15803d',
                 },
                 // Custom slate overrides for deeper dark mode
                 'nsync-slate': {

@@ -19,10 +19,10 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // User::factory()->create([
+        //     'name' => 'Test User',
+        //     'email' => 'test@example.com',
+        // ]);
 
         (new RoleSeeder())->run();
         (new AdminSeeder())->run();
@@ -30,5 +30,7 @@ class DatabaseSeeder extends Seeder
         (new BoardSeeder())->run();
         (new StageSeeder())->run();
         (new TaskSeeder())->run();
+        $this->call(PlanSeeder::class);
     }
 }
+

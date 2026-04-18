@@ -12,12 +12,24 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tasks', function (Blueprint $table) {
-            $table->text('description')->nullable()->after('title');
-            $table->json('assignees')->nullable()->after('description');
-            $table->json('labels')->nullable()->after('assignees');
-            $table->date('due_date')->nullable()->after('labels');
-            $table->json('attachments')->nullable()->after('due_date');
-            $table->json('checklists')->nullable()->after('attachments');
+            if (!Schema::hasColumn('tasks', 'description')) {
+                $table->text('description')->nullable()->after('title');
+            }
+            if (!Schema::hasColumn('tasks', 'assignees')) {
+                $table->json('assignees')->nullable()->after('description');
+            }
+            if (!Schema::hasColumn('tasks', 'labels')) {
+                $table->json('labels')->nullable()->after('assignees');
+            }
+            if (!Schema::hasColumn('tasks', 'due_date')) {
+                $table->date('due_date')->nullable()->after('labels');
+            }
+            if (!Schema::hasColumn('tasks', 'attachments')) {
+                $table->json('attachments')->nullable()->after('due_date');
+            }
+            if (!Schema::hasColumn('tasks', 'checklists')) {
+                $table->json('checklists')->nullable()->after('attachments');
+            }
         });
     }
 

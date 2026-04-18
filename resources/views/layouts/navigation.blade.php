@@ -21,9 +21,17 @@
                        class="px-4 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('dashboard') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50' }}">
                         Dashboard
                     </a>
-                    <a href="{{ route('boards.index') }}" 
+<a href="{{ route('boards.index') }}" 
                        class="px-4 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('boards.*') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50' }}">
                         Boards
+                    </a>
+                    <a href="/team-members" 
+                       class="px-4 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('team-members') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50' }}">
+                        Team Members
+                    </a>
+                    <a href="{{ route('reports') }}"
+                       class="px-4 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('reports') ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50' }}">
+                        Reports
                     </a>
                 </div>
             </div>
@@ -49,7 +57,7 @@
                             <p class="text-xs text-gray-600">{{ Auth::user()->email }}</p>
                         </div>
                         
-                        <a href="{{ route('settings') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">Settings</a>
+                        <a href="/settings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">Settings</a>
                         
                         <form method="POST" action="{{ route('logout') }}" class="border-t border-gray-200">
                             @csrf

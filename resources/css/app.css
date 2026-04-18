@@ -1,3 +1,111 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+    --tenant-primary: #16A34A;
+    --tenant-secondary: #FFFFFF;
+}
+
+body {
+    background-color: var(--tenant-secondary);
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+.bg-emerald-600,
+.bg-green-600,
+.bg-nsync-green-600,
+.peer-checked\:bg-nsync-green-600:checked,
+.peer:checked ~ .peer-checked\:bg-nsync-green-600 {
+    background-color: var(--tenant-primary) !important;
+}
+
+.hover\:bg-emerald-700:hover,
+.hover\:bg-green-700:hover,
+.hover\:bg-nsync-green-700:hover {
+    background-color: color-mix(in srgb, var(--tenant-primary) 88%, #000 12%) !important;
+}
+
+.from-nsync-green-500 {
+    --tw-gradient-from: color-mix(in srgb, var(--tenant-primary) 92%, white 8%) var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.to-nsync-green-600 {
+    --tw-gradient-to: var(--tenant-primary) var(--tw-gradient-to-position) !important;
+}
+
+.bg-nsync-green-50 {
+    background-color: color-mix(in srgb, var(--tenant-primary) 8%, var(--tenant-secondary) 92%) !important;
+}
+
+.bg-nsync-green-50\/60 {
+    background-color: color-mix(in srgb, var(--tenant-primary) 10%, var(--tenant-secondary) 90%) !important;
+}
+
+.bg-nsync-green-100 {
+    background-color: color-mix(in srgb, var(--tenant-primary) 16%, var(--tenant-secondary) 84%) !important;
+}
+
+.border-emerald-600,
+.border-green-600,
+.border-nsync-green-600 {
+    border-color: var(--tenant-primary) !important;
+}
+
+.border-nsync-green-100 {
+    border-color: color-mix(in srgb, var(--tenant-primary) 20%, white 80%) !important;
+}
+
+.border-nsync-green-200 {
+    border-color: color-mix(in srgb, var(--tenant-primary) 30%, white 70%) !important;
+}
+
+.hover\:border-nsync-green-300:hover {
+    border-color: color-mix(in srgb, var(--tenant-primary) 42%, white 58%) !important;
+}
+
+.text-emerald-600,
+.text-green-600,
+.text-nsync-green-600 {
+    color: var(--tenant-primary) !important;
+}
+
+.text-nsync-green-700,
+.hover\:text-nsync-green-700:hover {
+    color: color-mix(in srgb, var(--tenant-primary) 86%, black 14%) !important;
+}
+
+.text-nsync-green-800 {
+    color: color-mix(in srgb, var(--tenant-primary) 74%, black 26%) !important;
+}
+
+.hover\:text-nsync-green-800:hover,
+.hover\:text-nsync-green-900:hover {
+    color: color-mix(in srgb, var(--tenant-primary) 68%, black 32%) !important;
+}
+
+.ring-emerald-500,
+.ring-green-500,
+.ring-nsync-green-500,
+.focus\:ring-2:focus {
+    --tw-ring-color: color-mix(in srgb, var(--tenant-primary) 46%, white 54%);
+}
+
+.focus\:ring-emerald-500:focus,
+.focus\:ring-green-500:focus,
+.focus\:ring-nsync-green-500:focus {
+    --tw-ring-color: color-mix(in srgb, var(--tenant-primary) 46%, white 54%) !important;
+}
+
+.focus\:border-transparent:focus {
+    border-color: transparent !important;
+}
+
+.tenant-themed-surface {
+    background-color: var(--tenant-secondary);
+}

@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -42,15 +45,83 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $user = User::withoutGlobalScopes()
+            ->where('email', $this->string('email')->toString())
+            ->first();
+
+        if (!$user) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => 'User does not exist.',
+            ]);
+        }
+
+        if (!Hash::check($this->string('password')->toString(), $user->password)) {
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'password' => 'Incorrect email or password.',
+            ]);
+        }
+
+        Auth::login($user, $this->boolean('remember'));
+        $host = strtolower($this->getHost());
+
+        // Admin URL allows system admins only.
+        if ($this->isAdminHost($host) && !$user->hasRole('Platform Administrator')) {
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'This login URL is for system administrators only.',
+            ]);
+        }
+
+        // Tenant URL allows only users belonging to that tenant.
+        $tenant = $this->detectTenantForLogin();
+        if (!$tenant && !$this->isCentralHost($host) && !$this->isAdminHost($host)) {
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+            throw ValidationException::withMessages([
+                'email' => 'Workspace URL not recognized.',
+            ]);
+        }
+
+        if ($tenant && (! $user->belongsToTenant($tenant) || $user->hasRole('Platform Administrator'))) {
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+            throw ValidationException::withMessages([
+                'email' => 'User does not exist. Make sure you belong in this organization.',
             ]);
         }
 
         RateLimiter::clear($this->throttleKey());
+    }
+
+    /**
+     * Detect tenant from host/path for login (mimic IdentifyTenant logic).
+     */
+    private function detectTenantForLogin(): ?Tenant
+    {
+        $host = strtolower($this->getHost());
+
+        if ($this->isCentralHost($host) || $this->isAdminHost($host)) {
+            return null;
+        }
+
+        return Tenant::where('domain', $host)->first()
+            ?? Tenant::where('domain', str_replace('www.', '', $host))->first();
+    }
+
+    private function isCentralHost(string $host): bool
+    {
+        return in_array($host, ['127.0.0.1', 'localhost'], true);
+    }
+
+    private function isAdminHost(string $host): bool
+    {
+        return $host === 'nsync.localhost';
     }
 
     /**
