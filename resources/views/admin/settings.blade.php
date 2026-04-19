@@ -11,12 +11,6 @@
         <span class="px-3 py-1 rounded-full bg-green-50 text-green-700 text-xs font-semibold">Central</span>
     </div>
 
-    @if(session('success'))
-        <div class="rounded-xl border border-green-100 bg-green-50 text-green-800 px-4 py-3 text-sm font-semibold">
-            {{ session('success') }}
-        </div>
-    @endif
-
     <form method="POST" action="{{ route('admin.settings.update') }}" class="space-y-6">
         @csrf
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -93,6 +87,30 @@
                         <input type="checkbox" name="notify_new_tenant" value="1" class="rounded text-green-600 border-gray-300 focus:ring-green-500" {{ ($settings['notify_new_tenant'] ?? false) ? 'checked' : '' }}>
                         Email me when a new tenant is created
                     </label>
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-gray-700">Primary Theme Colors (HEX)</label>
+                        <textarea
+                            name="theme_primary_options"
+                            rows="4"
+                            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-green-500"
+                            placeholder="#16A34A&#10;#34D399&#10;#60A5FA"
+                        >{{ old('theme_primary_options', implode(PHP_EOL, $settings['theme_primary_options'] ?? [])) }}</textarea>
+                        <p class="text-xs text-gray-500">Enter one HEX color per line (or comma/space separated). These appear in tenant Settings.</p>
+                        @error('theme_primary_options') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-gray-700">Secondary Theme Colors (HEX)</label>
+                        <textarea
+                            name="theme_secondary_options"
+                            rows="4"
+                            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-green-500"
+                            placeholder="#FFFFFF&#10;#F8FAFC&#10;#ECFEFF"
+                        >{{ old('theme_secondary_options', implode(PHP_EOL, $settings['theme_secondary_options'] ?? [])) }}</textarea>
+                        <p class="text-xs text-gray-500">Enter one HEX color per line (or comma/space separated). Keep light tones for readability.</p>
+                        @error('theme_secondary_options') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
                 </div>
 
                 <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 space-y-4">

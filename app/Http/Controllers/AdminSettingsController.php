@@ -35,6 +35,8 @@ class AdminSettingsController extends Controller
             'maintenance_enabled' => 'sometimes|boolean',
             'maintenance_message' => 'nullable|string|max:255',
             'support_email' => 'nullable|email',
+            'theme_primary_options' => 'nullable|string|max:5000',
+            'theme_secondary_options' => 'nullable|string|max:5000',
         ]);
 
         // Update admin profile
@@ -57,10 +59,40 @@ class AdminSettingsController extends Controller
             'maintenance_enabled' => $request->boolean('maintenance_enabled'),
             'maintenance_message' => $validated['maintenance_message'] ?? null,
             'support_email' => $validated['support_email'] ?? null,
+            'theme_primary_options' => $this->parseHexColorOptions(
+                $validated['theme_primary_options'] ?? '',
+                AppSetting::get('theme_primary_options', AppSetting::data()['theme_primary_options'] ?? [])
+            ),
+            'theme_secondary_options' => $this->parseHexColorOptions(
+                $validated['theme_secondary_options'] ?? '',
+                AppSetting::get('theme_secondary_options', AppSetting::data()['theme_secondary_options'] ?? [])
+            ),
         ];
 
         AppSetting::updateSettings($payload);
 
         return back()->with('success', 'Settings updated.');
+    }
+
+    private function parseHexColorOptions(string $raw, array $fallback): array
+    {
+        $tokens = preg_split('/[\s,]+/', strtoupper(trim($raw))) ?: [];
+
+        $colors = collect($tokens)
+            ->map(fn (string $value) => trim($value))
+            ->filter()
+            ->map(function (string $value): ?string {
+                if (!str_starts_with($value, '#')) {
+                    $value = '#' . $value;
+                }
+
+                return preg_match('/^#[0-9A-F]{6}$/', $value) ? $value : null;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return $colors !== [] ? $colors : $fallback;
     }
 }

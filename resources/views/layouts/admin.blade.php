@@ -21,6 +21,18 @@
 </head>
 
 <body class="bg-white text-gray-900 min-h-screen overflow-hidden">
+@php
+    $systemFlashType = null;
+    $systemFlashMessage = null;
+
+    foreach (['success', 'error', 'warning', 'message'] as $flashKey) {
+        if (session()->has($flashKey)) {
+            $systemFlashType = $flashKey === 'message' ? 'info' : $flashKey;
+            $systemFlashMessage = (string) session($flashKey);
+            break;
+        }
+    }
+@endphp
 
 <div class="flex h-screen overflow-hidden font-sans">
     <aside class="w-64 bg-white border-r border-gray-100 flex flex-col">
@@ -54,6 +66,16 @@
             <a href="{{ route('admin.billing') }}" class="flex items-center gap-3 p-3 rounded-xl font-bold transition-all {{ request()->routeIs('admin.billing') ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900' }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"/></svg>
                 Billing
+            </a>
+
+            <a href="{{ route('admin.support.index') }}" class="flex items-center gap-3 p-3 rounded-xl font-bold transition-all {{ request()->routeIs('admin.support.*') ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900' }}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-4l-4 4v-4z"/></svg>
+                Support
+            </a>
+
+            <a href="{{ route('admin.patches') }}" class="flex items-center gap-3 p-3 rounded-xl font-bold transition-all {{ request()->routeIs('admin.patches') ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900' }}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Patches
             </a>
 
             <a href="{{ route('admin.archive') }}" class="flex items-center gap-3 p-3 rounded-xl font-bold transition-all {{ request()->routeIs('admin.archive') ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900' }}">
@@ -102,13 +124,24 @@
                 $initials = collect(explode(' ', trim($adminUser->name ?? '')))->filter()->take(2)->map(fn($p) => strtoupper(mb_substr($p,0,1)))->implode('');
                 $roleLabel = $adminUser?->getRoleNames()->first() ?? 'Platform Administrator';
             @endphp
-            <div class="flex items-center gap-3 p-1.5 pr-4 hover:bg-gray-50 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-gray-100">
-                <div class="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm" style="background: var(--tenant-primary);">
-                    {{ $initials ?: 'PA' }}
-                </div>
-                <div class="hidden md:block text-left">
-                    <p class="text-sm font-bold text-gray-900 leading-none">{{ $adminUser?->name ?? 'Admin' }}</p>
-                    <p class="text-sm font-bold text-gray-400 uppercase tracking-wider mt-1">{{ $roleLabel }}</p>
+            <div class="flex items-center gap-3">
+                <a href="{{ route('admin.patches') }}"
+                   class="hidden rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-green-700 md:inline-flex">
+                    Create Patch
+                </a>
+                <a href="{{ route('admin.support.index') }}"
+                   class="hidden rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 md:inline-flex">
+                    Open Support
+                </a>
+
+                <div class="flex items-center gap-3 p-1.5 pr-4 hover:bg-gray-50 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-gray-100">
+                    <div class="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm" style="background: var(--tenant-primary);">
+                        {{ $initials ?: 'PA' }}
+                    </div>
+                    <div class="hidden md:block text-left">
+                        <p class="text-sm font-bold text-gray-900 leading-none">{{ $adminUser?->name ?? 'Admin' }}</p>
+                        <p class="text-sm font-bold text-gray-400 uppercase tracking-wider mt-1">{{ $roleLabel }}</p>
+                    </div>
                 </div>
             </div>
         </header>
@@ -120,6 +153,177 @@
 </div>
 
 @livewireScripts
+<div id="nsyncSystemModalRoot"
+     class="fixed inset-0 z-[200] hidden items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"
+     aria-hidden="true">
+    <div class="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div id="nsyncSystemModalHeader" class="px-6 py-5 border-b border-slate-100 bg-slate-50">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p id="nsyncSystemModalEyebrow" class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">System Message</p>
+                    <h2 id="nsyncSystemModalTitle" class="mt-2 text-2xl font-black text-slate-900">Notice</h2>
+                </div>
+                <button type="button" id="nsyncSystemModalClose"
+                        class="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-600"
+                        aria-label="Close dialog">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="px-6 py-6">
+            <p id="nsyncSystemModalMessage" class="text-base leading-7 text-slate-700"></p>
+        </div>
+        <div id="nsyncSystemModalActions" class="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-5">
+            <button type="button" id="nsyncSystemModalCancel"
+                    class="rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 hidden">
+                Cancel
+            </button>
+            <button type="button" id="nsyncSystemModalConfirm"
+                    class="rounded-xl bg-nsync-green-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-nsync-green-700">
+                OK
+            </button>
+        </div>
+    </div>
+</div>
+<script>
+    (() => {
+        const root = document.getElementById('nsyncSystemModalRoot');
+        if (!root) return;
+
+        const header = document.getElementById('nsyncSystemModalHeader');
+        const eyebrow = document.getElementById('nsyncSystemModalEyebrow');
+        const titleEl = document.getElementById('nsyncSystemModalTitle');
+        const messageEl = document.getElementById('nsyncSystemModalMessage');
+        const closeBtn = document.getElementById('nsyncSystemModalClose');
+        const cancelBtn = document.getElementById('nsyncSystemModalCancel');
+        const confirmBtn = document.getElementById('nsyncSystemModalConfirm');
+        const actions = document.getElementById('nsyncSystemModalActions');
+
+        let confirmAction = null;
+
+        const palette = {
+            success: {
+                header: 'px-6 py-5 border-b border-green-100 bg-green-50',
+                eyebrow: 'text-xs font-bold uppercase tracking-[0.18em] text-green-700',
+                title: 'Success',
+                eyebrowText: 'Completed',
+                confirmClass: 'rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-green-700',
+            },
+            error: {
+                header: 'px-6 py-5 border-b border-red-100 bg-red-50',
+                eyebrow: 'text-xs font-bold uppercase tracking-[0.18em] text-red-700',
+                title: 'Error',
+                eyebrowText: 'Action Failed',
+                confirmClass: 'rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-red-700',
+            },
+            warning: {
+                header: 'px-6 py-5 border-b border-amber-100 bg-amber-50',
+                eyebrow: 'text-xs font-bold uppercase tracking-[0.18em] text-amber-700',
+                title: 'Warning',
+                eyebrowText: 'Attention',
+                confirmClass: 'rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-amber-700',
+            },
+            info: {
+                header: 'px-6 py-5 border-b border-sky-100 bg-sky-50',
+                eyebrow: 'text-xs font-bold uppercase tracking-[0.18em] text-sky-700',
+                title: 'Notice',
+                eyebrowText: 'System Message',
+                confirmClass: 'rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-sky-700',
+            },
+            confirm: {
+                header: 'px-6 py-5 border-b border-slate-100 bg-slate-50',
+                eyebrow: 'text-xs font-bold uppercase tracking-[0.18em] text-slate-500',
+                title: 'Confirm Action',
+                eyebrowText: 'Please Confirm',
+                confirmClass: 'rounded-xl bg-nsync-green-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-nsync-green-700',
+            },
+        };
+
+        const closeModal = () => {
+            root.classList.add('hidden');
+            root.classList.remove('flex');
+            root.setAttribute('aria-hidden', 'true');
+            confirmAction = null;
+        };
+
+        const openModal = ({ type = 'info', title, message = '', confirmLabel = 'OK', cancelLabel = 'Cancel', isConfirm = false, onConfirm = null }) => {
+            const tone = palette[type] || palette.info;
+            header.className = tone.header;
+            eyebrow.className = tone.eyebrow;
+            eyebrow.textContent = tone.eyebrowText;
+            titleEl.textContent = title || tone.title;
+            messageEl.textContent = message;
+
+            confirmBtn.className = tone.confirmClass;
+            confirmBtn.textContent = confirmLabel;
+
+            if (isConfirm) {
+                cancelBtn.classList.remove('hidden');
+                cancelBtn.textContent = cancelLabel;
+            } else {
+                cancelBtn.classList.add('hidden');
+            }
+
+            confirmAction = typeof onConfirm === 'function' ? onConfirm : null;
+            root.classList.remove('hidden');
+            root.classList.add('flex');
+            root.setAttribute('aria-hidden', 'false');
+        };
+
+        root.addEventListener('click', (event) => {
+            if (event.target === root) closeModal();
+        });
+        closeBtn?.addEventListener('click', closeModal);
+        cancelBtn?.addEventListener('click', closeModal);
+        confirmBtn?.addEventListener('click', () => {
+            if (confirmAction) {
+                confirmAction();
+                return;
+            }
+            closeModal();
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !root.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        document.querySelectorAll('form[data-confirm-modal="true"]').forEach((form) => {
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+
+                openModal({
+                    type: 'confirm',
+                    title: form.dataset.confirmTitle || 'Confirm Action',
+                    message: form.dataset.confirmMessage || 'Do you want to continue?',
+                    confirmLabel: form.dataset.confirmButton || 'Continue',
+                    cancelLabel: form.dataset.cancelButton || 'Cancel',
+                    isConfirm: true,
+                    onConfirm: () => form.submit(),
+                });
+            });
+        });
+
+        const flashType = @js($systemFlashType);
+        const flashMessage = @js($systemFlashMessage);
+        if (flashType && flashMessage) {
+            openModal({
+                type: flashType,
+                message: flashMessage,
+                isConfirm: false,
+                confirmLabel: 'OK',
+            });
+        }
+
+        window.NSyncSystemModal = {
+            open: openModal,
+            close: closeModal,
+        };
+    })();
+</script>
 
 </body>
 </html>

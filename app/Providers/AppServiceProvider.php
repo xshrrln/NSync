@@ -6,6 +6,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
+use Livewire\Features\SupportFileUploads\FilePreviewController;
+use Livewire\Features\SupportFileUploads\FileUploadController;
 use Illuminate\Support\Facades\Schema;
 use App\Models\Tenant;
 use App\Models\Plan;
@@ -52,6 +54,12 @@ class AppServiceProvider extends ServiceProvider
         Livewire::setUpdateRoute(function ($handle) {
             return Route::post('/livewire/update', $handle);
         });
+
+        // Keep file uploads aligned with custom /livewire routes across subdomains.
+        Route::post('/livewire/upload-file', [FileUploadController::class, 'handle'])
+            ->name('livewire.upload-file');
+        Route::get('/livewire/preview-file/{filename}', [FilePreviewController::class, 'handle'])
+            ->name('livewire.preview-file');
 
         // Auto-provision tenant databases on creation
         Tenant::observe(TenantObserver::class);

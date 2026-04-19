@@ -26,6 +26,19 @@
         </div>
     </div>
 
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <a href="{{ route('admin.patches') }}" class="rounded-2xl border border-green-200 bg-green-50 px-6 py-5 transition hover:bg-green-100">
+            <p class="text-xs font-bold uppercase tracking-widest text-green-700">Central Updates</p>
+            <h3 class="mt-1 text-lg font-black text-gray-900">Create Patch</h3>
+            <p class="mt-1 text-sm text-gray-600">Publish a patch and notify tenant admins in one step.</p>
+        </a>
+        <a href="{{ route('admin.support.index') }}" class="rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5 transition hover:bg-slate-100">
+            <p class="text-xs font-bold uppercase tracking-widest text-slate-600">Tenant Assistance</p>
+            <h3 class="mt-1 text-lg font-black text-gray-900">Open Support Desk</h3>
+            <p class="mt-1 text-sm text-gray-600">Review all support tickets, reply, and close issues quickly.</p>
+        </a>
+    </div>
+
     <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="px-8 py-6 border-b border-gray-50 flex justify-between items-center">
             <h3 class="text-lg font-bold text-gray-900">Recent Registrations</h3>

@@ -12,9 +12,6 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
-    Route::get('auth/handoff', [AuthenticatedSessionController::class, 'handoff'])
-        ->name('auth.handoff');
-
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
@@ -26,9 +23,6 @@ Route::middleware('guest')->group(function () {
 
     Route::post('register/billing', [RegisteredUserController::class, 'completeBilling'])
         ->name('register.billing.store');
-
-    Route::get('login', [AuthenticatedSessionController::class, 'create'])
-        ->name('login');
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 
@@ -44,6 +38,15 @@ Route::middleware('guest')->group(function () {
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
 });
+
+// Keep localhost login accessible even when another session is active.
+Route::get('login', [AuthenticatedSessionController::class, 'create'])
+    ->name('login');
+
+// Must remain outside guest middleware so cross-host login handoff can
+// replace stale authenticated sessions on the destination host.
+Route::get('auth/handoff', [AuthenticatedSessionController::class, 'handoff'])
+    ->name('auth.handoff');
 
 Route::middleware('auth')->group(function () {
     Route::get('verify-email', EmailVerificationPromptController::class)

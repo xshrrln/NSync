@@ -130,12 +130,11 @@ new class extends Component {
     }
 
     public function getFeaturesCatalogProperty() {
-        return [
-            'basic-kanban', 'board-creation', 'member-invites', 'role-permissions',
-            'task-checklists', 'file-attachments', 'due-date-reminders',
-            'unlimited-boards', 'basic-analytics', 'guest-boards',
-            'advanced-reporting', 'activity-logs', 'two-factor', 'audit-export',
-        ];
+        return collect(config('features.categories', []))
+            ->flatMap(fn ($category) => array_keys($category['features'] ?? []))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function with(): array
@@ -148,4 +147,3 @@ new class extends Component {
         ];
     }
 };
-

@@ -18,6 +18,10 @@ class Message extends Model
         'message',
     ];
 
+    protected $casts = [
+        'message' => 'encrypted',
+    ];
+
     public function sender()
     {
         return $this->belongsTo(User::class, 'sender_id');
@@ -34,4 +38,3 @@ class Message extends Model
         return $query->where('room_id', $roomId);
     }
 }
-

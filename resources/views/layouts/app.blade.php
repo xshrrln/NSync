@@ -115,9 +115,19 @@
                         <x-dropdown align="right">
                             <x-slot name="trigger">
                                 <button class="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 rounded-xl transition font-medium text-sm">
-                                    <div class="w-9 h-9 bg-gradient-to-br from-gray-600 to-gray-700 rounded-2xl flex items-center justify-center text-white font-semibold text-sm shadow-lg">
-                                        {{ strtoupper(substr($authUser->name, 0, 2)) }}
-                                    </div>
+                                    @php
+                                        $avatarPath = (string) ($authUser->avatar ?? '');
+                                        $avatarSrc = $avatarPath !== ''
+                                            ? (str_starts_with($avatarPath, 'http') ? $avatarPath : Storage::url($avatarPath))
+                                            : null;
+                                    @endphp
+                                    @if($avatarSrc)
+                                        <img src="{{ $avatarSrc }}" alt="{{ $authUser->name }}" class="w-9 h-9 rounded-2xl object-cover shadow-lg border border-gray-200">
+                                    @else
+                                        <div class="w-9 h-9 bg-gradient-to-br from-gray-600 to-gray-700 rounded-2xl flex items-center justify-center text-white font-semibold text-sm shadow-lg">
+                                            {{ strtoupper(substr($authUser->name, 0, 2)) }}
+                                        </div>
+                                    @endif
                                     <span class="hidden md:block">{{ $authUser->name }}</span>
                                     <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -142,15 +152,18 @@
         </header>
         
         <!-- Main Content with Sidebar -->
-        <div class="flex flex-1 min-h-0 overflow-hidden bg-[var(--tenant-secondary)] transition-colors duration-300">
+        <div class="flex flex-1 min-h-0 overflow-hidden bg-white transition-colors duration-300">
             <!-- Sidebar Navigation -->
             <aside class="w-64 h-full overflow-y-auto bg-white border-r shadow-sm flex-shrink-0">
-                <div class="px-6 pt-4 pb-10 border-b">
+                <div class="px-6 py-4 border-b min-h-[116px] flex flex-col justify-center">
                     <div class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Workspace</div>
                     <div class="flex items-center gap-2 mt-2">
                         <span class="text-base font-bold text-gray-900">{{ $currentTenant->name ?? 'No workspace selected' }}</span>
                         @if($currentTenant)
-                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">{{ ucfirst($currentTenant->plan) }} Plan</span>
+                            <span
+                                class="inline-flex px-3 py-1 text-xs font-semibold rounded-full border"
+                                style="background-color: color-mix(in srgb, var(--tenant-primary) 14%, white 86%); color: color-mix(in srgb, var(--tenant-primary) 82%, black 18%); border-color: color-mix(in srgb, var(--tenant-primary) 30%, white 70%);"
+                            >{{ ucfirst($currentTenant->plan) }} Plan</span>
                         @endif
                     </div>
                 </div>
@@ -185,7 +198,13 @@
                         </svg>
                         Reports
                     </a>
-                    <a href="{{ route('settings') }}" class="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 font-medium rounded-r-lg transition group">
+                    <a href="{{ route('support') }}" class="flex items-center px-4 py-3 {{ request()->routeIs('support') ? 'bg-nsync-green-50 border-r-2 border-nsync-green-600 text-nsync-green-700' : 'text-gray-700 hover:bg-gray-50' }} font-medium rounded-r-lg transition group">
+                        <svg class="w-5 h-5 mr-3 opacity-75 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-4l-4 4v-4z"/>
+                        </svg>
+                        Support
+                    </a>
+                    <a href="{{ route('settings') }}" class="flex items-center px-4 py-3 {{ request()->routeIs('settings') ? 'bg-nsync-green-50 border-r-2 border-nsync-green-600 text-nsync-green-700' : 'text-gray-700 hover:bg-gray-50' }} font-medium rounded-r-lg transition group">
                         <svg class="w-5 h-5 mr-3 opacity-75 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 3.35 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-3.35 1.756 0 3.35a1.724 1.724 0 002.573 1.066c1.543.94 3.31-.826 2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-3.35-.426 0-3.35a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826 2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756.426-3.35.426 0 3.35a1.724 1.724 0 00-2.573 1.066c-1.543-.94-3.31.826-2.37 2.37a1.724 1.724 0 00-1.065 2.572c.426 1.756 3.35.426 0 3.35a1.724 1.724 0 002.573-1.066c1.543-.94 3.31.826 2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-3.35-.426 0-3.35a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826 2.37-2.37a1.724 1.724 0 00-1.065-2.572c1.756.426 3.35.426 0 3.35a1.724 1.724 0 002.573 1.066c1.543 .94 3.31 -.826 2.37 -2.37a1.724 1.724 0 00-1.065 -2.572c-1.756 -.426 -3.35 .426 0 3.35a1.724 1.724 0 00-2.573 -1.066c-1.543 .94 -3.31 -.826 2.37 -2.37a1.724 1.724 0 00-1.065 -2.572c.426 1.756 3.35 .426 0 3.35a1.724 1.724 0 002.573 1.066c1.543 .94 3.31 -.826 2.37 -2.37"/>
                         </svg>
@@ -195,7 +214,7 @@
             </aside>
             
             <!-- Page Content -->
-            <main class="flex-1 min-h-0 overflow-y-auto px-8 pb-8 pt-0 bg-[var(--tenant-secondary)] transition-colors duration-300">
+            <main class="flex-1 min-h-0 overflow-y-auto px-8 pb-8 pt-0 bg-white transition-colors duration-300">
                 {{ $slot }}
             </main>
         </div>

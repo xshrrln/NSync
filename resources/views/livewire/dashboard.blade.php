@@ -243,7 +243,7 @@ new class extends Component {
         <div class="max-w-7xl mx-auto px-6">
             <div class="flex items-center py-4">
                 <div class="flex-1">
-                    <h1 class="text-2xl font-bold text-gray-900 mb-0">Dashboard</h1>
+                    <h1 class="text-2xl font-bold mb-0" style="color: color-mix(in srgb, var(--tenant-primary) 88%, black 12%);">Dashboard</h1>
                     <p class="text-gray-600 mb-0">Welcome back, {{ Auth::user()->name }}!</p>
                 </div>
             </div>
@@ -510,6 +510,107 @@ new class extends Component {
     <script>
         window.__nsyncCharts = window.__nsyncCharts || {};
 
+        const hexToRgb = (hex) => {
+            const value = String(hex || '').trim().replace('#', '');
+            const normalized = value.length === 3
+                ? value.split('').map((c) => c + c).join('')
+                : value;
+
+            if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+                return { r: 22, g: 163, b: 74 };
+            }
+
+            return {
+                r: parseInt(normalized.slice(0, 2), 16),
+                g: parseInt(normalized.slice(2, 4), 16),
+                b: parseInt(normalized.slice(4, 6), 16),
+            };
+        };
+
+        const rgba = (rgb, alpha = 1) => `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+        const mixWithWhite = (rgb, ratio = 0.75) => ({
+            r: Math.round(rgb.r + (255 - rgb.r) * ratio),
+            g: Math.round(rgb.g + (255 - rgb.g) * ratio),
+            b: Math.round(rgb.b + (255 - rgb.b) * ratio),
+        });
+
+        const getTenantPrimary = () => {
+            const raw = getComputedStyle(document.body).getPropertyValue('--tenant-primary').trim();
+            return raw || '#16A34A';
+        };
+
+        const buildThemePalette = () => {
+            const primaryHex = getTenantPrimary();
+            const primaryRgb = hexToRgb(primaryHex);
+            const softRgb = mixWithWhite(primaryRgb, 0.78);
+
+            return {
+                primaryHex,
+                primaryRgb,
+                softRgb,
+                lineBorder: primaryHex,
+                lineFill: rgba(primaryRgb, 0.16),
+                barStart: rgba(primaryRgb, 0.95),
+                barEnd: rgba(primaryRgb, 0.55),
+                pieStart: primaryRgb,
+                pieEnd: softRgb,
+            };
+        };
+
+        const buildPieGradientColors = (labels, startRgb, endRgb) => {
+            return labels.map((_, index) => {
+                const steps = Math.max(1, labels.length - 1);
+                const t = labels.length <= 2 ? index : (index / steps);
+                const r = Math.round(startRgb.r + (endRgb.r - startRgb.r) * t);
+                const g = Math.round(startRgb.g + (endRgb.g - startRgb.g) * t);
+                const b = Math.round(startRgb.b + (endRgb.b - startRgb.b) * t);
+                return `rgb(${r}, ${g}, ${b})`;
+            });
+        };
+
+        const applyThemeToDashboardCharts = () => {
+            const palette = buildThemePalette();
+
+            if (window.__nsyncCharts.trend) {
+                const trendDataset = window.__nsyncCharts.trend.data.datasets?.[0];
+                if (trendDataset) {
+                    trendDataset.borderColor = palette.lineBorder;
+                    trendDataset.backgroundColor = palette.lineFill;
+                    trendDataset.pointBackgroundColor = palette.lineBorder;
+                    window.__nsyncCharts.trend.update();
+                }
+            }
+
+            if (window.__nsyncCharts.boardBreakdown) {
+                const boardChart = window.__nsyncCharts.boardBreakdown;
+                const gradient = boardChart.ctx.createLinearGradient(0, 0, 0, 260);
+                gradient.addColorStop(0, palette.barStart);
+                gradient.addColorStop(1, palette.barEnd);
+
+                const boardDataset = boardChart.data.datasets?.[0];
+                if (boardDataset) {
+                    boardDataset.backgroundColor = gradient;
+                    boardDataset.borderColor = palette.lineBorder;
+                    boardChart.update();
+                }
+            }
+
+            if (window.__nsyncCharts.memberWorkload) {
+                const memberChart = window.__nsyncCharts.memberWorkload;
+                const colors = buildPieGradientColors(
+                    memberChart.data.labels || [],
+                    palette.pieStart,
+                    palette.pieEnd
+                );
+                const memberDataset = memberChart.data.datasets?.[0];
+                if (memberDataset) {
+                    memberDataset.backgroundColor = colors;
+                    memberChart.update();
+                }
+            }
+        };
+
+        const themePalette = buildThemePalette();
         const trendCtx = document.getElementById('taskTrendChart');
         if (trendCtx) {
             if (window.__nsyncCharts.trend) {
@@ -523,13 +624,13 @@ new class extends Component {
                     datasets: [{
                         label: 'Activity Events',
                         data: @json($trendData),
-                        borderColor: '#16a34a',
-                        backgroundColor: 'rgba(22, 163, 74, 0.15)',
+                        borderColor: themePalette.lineBorder,
+                        backgroundColor: themePalette.lineFill,
                         borderWidth: 2,
                         fill: true,
                         tension: 0.3,
                         pointRadius: 4,
-                        pointBackgroundColor: '#16a34a'
+                        pointBackgroundColor: themePalette.lineBorder
                     }]
                 },
                 options: {
@@ -551,8 +652,8 @@ new class extends Component {
             }
 
             const boardGradient = boardCtx.getContext('2d').createLinearGradient(0, 0, 0, 260);
-            boardGradient.addColorStop(0, 'rgba(22, 163, 74, 0.95)');
-            boardGradient.addColorStop(1, 'rgba(34, 197, 94, 0.55)');
+            boardGradient.addColorStop(0, themePalette.barStart);
+            boardGradient.addColorStop(1, themePalette.barEnd);
 
             window.__nsyncCharts.boardBreakdown = new Chart(boardCtx, {
                 type: 'bar',
@@ -562,7 +663,7 @@ new class extends Component {
                         label: 'Tasks',
                         data: @json($boardData),
                         backgroundColor: boardGradient,
-                        borderColor: '#16a34a',
+                        borderColor: themePalette.lineBorder,
                         borderWidth: 1,
                         borderRadius: 8,
                         borderSkipped: false
@@ -609,16 +710,7 @@ new class extends Component {
 
             const memberLabels = @json($memberWorkloadLabels);
             const memberData = @json($memberWorkloadData);
-            const start = { r: 22, g: 163, b: 74 };   // green
-            const end = { r: 220, g: 252, b: 231 };   // white-green
-            const memberColors = memberLabels.map((_, index) => {
-                const steps = Math.max(1, memberLabels.length - 1);
-                const t = memberLabels.length <= 2 ? index : (index / steps);
-                const r = Math.round(start.r + (end.r - start.r) * t);
-                const g = Math.round(start.g + (end.g - start.g) * t);
-                const b = Math.round(start.b + (end.b - start.b) * t);
-                return `rgb(${r}, ${g}, ${b})`;
-            });
+            const memberColors = buildPieGradientColors(memberLabels, themePalette.pieStart, themePalette.pieEnd);
             const totalMemberTasks = memberData.reduce((sum, value) => sum + Number(value || 0), 0);
 
             window.__nsyncCharts.memberWorkload = new Chart(memberCtx, {
@@ -677,6 +769,10 @@ new class extends Component {
                 }
             });
         }
+
+        window.addEventListener('tenant-theme-updated', () => {
+            applyThemeToDashboardCharts();
+        });
     </script>
 @endpush
 

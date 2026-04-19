@@ -28,7 +28,7 @@ class AppSetting extends Model
             $settings = static::create(['data' => []]);
         }
 
-        return $settings->data ?? static::defaults();
+        return array_replace(static::defaults(), $settings->data ?? []);
     }
 
     /**
@@ -64,6 +64,23 @@ class AppSetting extends Model
             'maintenance_enabled' => false,
             'maintenance_message' => 'All systems operational.',
             'support_email' => null,
+            'theme_primary_options' => [
+                '#16A34A',
+                '#34D399',
+                '#60A5FA',
+                '#FBBF24',
+                '#F472B6',
+                '#F87171',
+                '#9CA3AF',
+            ],
+            'theme_secondary_options' => [
+                '#FFFFFF',
+                '#F8FAFC',
+                '#ECFEFF',
+                '#FFF7ED',
+                '#FEF2F2',
+                '#F3F4F6',
+            ],
         ];
     }
 }

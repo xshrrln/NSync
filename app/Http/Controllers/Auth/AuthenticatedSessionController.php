@@ -18,6 +18,15 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): View|RedirectResponse
     {
+        $host = strtolower(request()->getHost());
+        $isLocalhost = in_array($host, ['localhost', '127.0.0.1'], true);
+
+        if ($isLocalhost && Auth::check()) {
+            Auth::guard('web')->logout();
+            request()->session()->invalidate();
+            request()->session()->regenerateToken();
+        }
+
         if (Auth::check()) {
             return redirect()->to($this->loginDestination(Auth::user()));
         }
@@ -153,7 +162,7 @@ class AuthenticatedSessionController extends Controller
             return $this->tenantUrl($tenant->domain);
         }
 
-        return '/admin/dashboard';
+        return route('pending-approval');
     }
 
     private function createHandoffUrl(User $user, string $destination): string

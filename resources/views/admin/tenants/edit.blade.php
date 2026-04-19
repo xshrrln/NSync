@@ -11,12 +11,6 @@
         <a href="{{ route('admin.tenants.index') }}" class="px-6 py-2.5 bg-nsync-green-600 text-white text-sm font-semibold rounded-xl hover:bg-nsync-green-700 transition-all shadow-lg">Back to Tenants</a>
     </div>
 
-    @if(session('success'))
-        <div class="rounded-xl border border-green-100 bg-green-50 text-green-800 px-4 py-3 text-sm font-semibold">
-            {{ session('success') }}
-        </div>
-    @endif
-
     @if($errors->any())
         <div class="rounded-xl border border-red-100 bg-red-50 text-red-700 px-4 py-3 text-sm font-semibold">
             Please review the form errors below.

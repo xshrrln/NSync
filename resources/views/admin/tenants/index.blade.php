@@ -7,18 +7,6 @@
         <p class="text-gray-500 font-medium mt-1">Full management and monitoring of all platform tenants.</p>
     </div>
 
-    @if(session('success'))
-        <div class="rounded-xl border border-green-100 bg-green-50 text-green-800 px-4 py-3 text-sm font-semibold">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="rounded-xl border border-red-100 bg-red-50 text-red-700 px-4 py-3 text-sm font-semibold">
-            {{ session('error') }}
-        </div>
-    @endif
-
     <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="px-8 py-6 bg-gray-50/50 border-b border-gray-100 flex flex-col md:flex-row md:items-center gap-4">
             <h3 class="font-bold text-gray-900 shrink-0">All Organizations</h3>
@@ -97,20 +85,32 @@
                         <td class="px-8 py-5 text-right">
                             <div class="flex flex-col sm:flex-row justify-end gap-2">
                                 @if($tenant->status === 'pending')
-                                    <form method="POST" action="{{ route('admin.tenants.approve', $tenant) }}" class="inline" onsubmit="return confirm('Approve {{ $tenant->name }}?')">
+                                    <form method="POST" action="{{ route('admin.tenants.approve', $tenant) }}" class="inline"
+                                          data-confirm-modal="true"
+                                          data-confirm-title="Approve Workspace"
+                                          data-confirm-message="Approve {{ $tenant->name }} and send workspace credentials to {{ $tenant->tenant_admin_email }}?"
+                                          data-confirm-button="Approve">
                                         @csrf @method('PATCH')
                                         <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-green-700 bg-green-50 hover:bg-green-100 rounded-md transition-all">
                                             Approve
                                         </button>
                                     </form>
-                                    <form method="POST" action="{{ route('admin.tenants.reject', $tenant) }}" class="inline" onsubmit="return confirm('Reject {{ $tenant->name }}?')">
+                                    <form method="POST" action="{{ route('admin.tenants.reject', $tenant) }}" class="inline"
+                                          data-confirm-modal="true"
+                                          data-confirm-title="Reject Workspace"
+                                          data-confirm-message="Reject {{ $tenant->name }} registration request?"
+                                          data-confirm-button="Reject">
                                         @csrf @method('PATCH')
                                         <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 rounded-md transition-all">
                                             Reject
                                         </button>
                                     </form>
                                 @elseif($tenant->status === 'active')
-                                    <form method="POST" action="{{ route('admin.tenants.suspend', $tenant) }}" class="inline" onsubmit="return confirm('Suspend {{ $tenant->name }}?')">
+                                    <form method="POST" action="{{ route('admin.tenants.suspend', $tenant) }}" class="inline"
+                                          data-confirm-modal="true"
+                                          data-confirm-title="Suspend Workspace"
+                                          data-confirm-message="Suspend {{ $tenant->name }} now? Members will lose access until resumed."
+                                          data-confirm-button="Suspend">
                                         @csrf @method('PATCH')
                                         <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-md transition-all">
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>

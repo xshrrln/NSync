@@ -15,9 +15,7 @@ new class extends Component {
     {
         $tenant = app('currentTenant');
 
-        $canViewReporting = $tenant
-            ? ($tenant->hasFeature('advanced-reporting') || Auth::user()->hasRole('Team Supervisor'))
-            : false;
+        $canViewReporting = $tenant ? $tenant->hasFeature('advanced-reporting') : false;
         $canExportAudit = $tenant ? $tenant->hasFeature('audit-export') : false;
 
         $rangeDays = match ($this->reportRange) {
@@ -103,7 +101,7 @@ new class extends Component {
     public function exportAdvancedReportPdf()
     {
         $tenant = app('currentTenant');
-        abort_unless($tenant && ($tenant->hasFeature('advanced-reporting') || Auth::user()->hasRole('Team Supervisor')), 403);
+        abort_unless($tenant && $tenant->hasFeature('advanced-reporting'), 403);
 
         $dbRows = Task::query()
             ->leftJoin('stages', 'stages.id', '=', 'tasks.stage_id')
@@ -344,24 +342,28 @@ new class extends Component {
     }
 }; ?>
 
-<div class="bg-white min-h-screen">
-    <div class="w-full text-left">
-        <div class="mb-8 flex items-center justify-between">
-            <div>
-                <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-nsync-green-600">Workspace Reports</span>
-                <h1 class="text-2xl font-bold text-gray-900 mb-0">Advanced Reporting & Audit Exports</h1>
-                <p class="text-gray-600 mb-0">Operational insights and downloadable compliance data for your workspace.</p>
-            </div>
-            <div>
-                <span class="rounded-full border border-nsync-green-100 bg-nsync-green-50 px-3 py-1 text-[10px] font-bold uppercase text-nsync-green-600">Reports</span>
+<div class="min-h-screen bg-white">
+    <div class="bg-white shadow-sm border-b sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex items-center justify-between py-4 min-h-[116px]">
+                <div>
+                    <h1 class="text-2xl font-bold mb-0" style="color: color-mix(in srgb, var(--tenant-primary) 88%, black 12%);">Advanced Reporting & Audit Exports</h1>
+                    <p class="text-gray-600 mb-0">Operational insights and downloadable compliance data for your workspace.</p>
+                </div>
+                <div>
+                    <span class="rounded-full border px-3 py-1 text-[10px] font-bold uppercase" style="border-color: color-mix(in srgb, var(--tenant-primary) 25%, white 75%); background-color: color-mix(in srgb, var(--tenant-primary) 10%, white 90%); color: color-mix(in srgb, var(--tenant-primary) 80%, black 20%);">Reports</span>
+                </div>
             </div>
         </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-6 py-8 text-left">
 
         @if($canViewReporting)
-            <div class="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-                <div class="bg-gradient-to-r from-slate-900 to-emerald-700 px-6 py-5 text-white">
-                    <h2 class="text-lg font-bold">Advanced Reporting</h2>
-                    <p class="mt-1 text-xs text-emerald-100">Operational and compliance insights for {{ $periodLabel }}</p>
+            <div class="rounded-2xl border bg-white shadow-sm overflow-hidden" style="border-color: color-mix(in srgb, var(--tenant-primary) 18%, white 82%);">
+                <div class="px-6 py-5 bg-white" style="border-bottom: 1px solid color-mix(in srgb, var(--tenant-primary) 15%, white 85%);">
+                    <h2 class="text-lg font-bold" style="color: color-mix(in srgb, var(--tenant-primary) 85%, black 15%);">Advanced Reporting</h2>
+                    <p class="mt-1 text-xs text-slate-600">Operational and compliance insights for {{ $periodLabel }}</p>
                 </div>
                 <div class="p-6">
                     <div class="mb-4 flex flex-wrap items-center gap-2">
@@ -370,9 +372,9 @@ new class extends Component {
                             <option value="30d">Last 30 days</option>
                             <option value="90d">Last 90 days</option>
                         </select>
-                        <button wire:click="exportAdvancedReportPdf" class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800">Export Report PDF</button>
+                        <button wire:click="exportAdvancedReportPdf" class="rounded-lg px-3 py-2 text-xs font-bold text-white" style="background-color: color-mix(in srgb, var(--tenant-primary) 80%, black 20%);">Export Report PDF</button>
                         @if($canExportAudit)
-                            <button wire:click="exportAuditPdf" class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700">Export Audit PDF</button>
+                            <button wire:click="exportAuditPdf" class="rounded-lg px-3 py-2 text-xs font-bold text-white" style="background-color: var(--tenant-primary);">Export Audit PDF</button>
                         @endif
                     </div>
 

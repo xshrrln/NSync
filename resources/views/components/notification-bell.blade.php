@@ -23,11 +23,41 @@
             open: false,
             keys: @js($notificationKeys),
             dismissed: [],
-            init() {},
-            isDismissed() { return false; },
-            dismiss() {},
-            markAllRead() {},
-            get unreadCount() { return this.keys.length; }
+            init() {
+                try {
+                    const raw = window.localStorage.getItem('nsync.notifications.dismissed') || '[]';
+                    const parsed = JSON.parse(raw);
+                    this.dismissed = Array.isArray(parsed) ? parsed.map((key) => String(key)) : [];
+                } catch (error) {
+                    this.dismissed = [];
+                }
+            },
+            isDismissed(key) {
+                return this.dismissed.includes(String(key));
+            },
+            dismiss(key) {
+                const normalized = String(key);
+                if (this.isDismissed(normalized)) {
+                    return;
+                }
+
+                this.dismissed = [...this.dismissed, normalized];
+                this.persist();
+            },
+            markAllRead() {
+                this.dismissed = [...new Set([...this.dismissed, ...this.keys.map((key) => String(key))])];
+                this.persist();
+            },
+            persist() {
+                try {
+                    window.localStorage.setItem('nsync.notifications.dismissed', JSON.stringify(this.dismissed));
+                } catch (error) {
+                    // Ignore storage errors.
+                }
+            },
+            get unreadCount() {
+                return this.keys.filter((key) => !this.dismissed.includes(String(key))).length;
+            }
         })"
     x-init="init(); open = false"
     @keydown.escape.window="open = false"
@@ -67,7 +97,7 @@
                 type="button"
                 class="text-xs font-semibold text-nsync-green-700 hover:text-nsync-green-800 disabled:opacity-50"
                 :disabled="unreadCount === 0"
-                @click="markAllRead()"
+                @click="markAllRead(); open = false"
             >
                 Mark all as read
             </button>
@@ -84,6 +114,7 @@
                     class="p-4 border-b border-gray-50 hover:bg-gray-50 transition {{ $isRead ? 'bg-gray-50' : '' }}"
                     x-show="!isDismissed(@js($notificationKey))"
                     x-cloak
+                    @click="dismiss(@js($notificationKey))"
                 >
                     <div class="flex items-start gap-3">
                         <div class="flex-shrink-0">
@@ -121,7 +152,7 @@
                                 <a
                                     href="{{ data_get($notification, 'url') }}"
                                     class="mt-2 inline-flex text-xs font-semibold text-nsync-green-700 hover:text-nsync-green-800"
-                                    @click="dismiss(@js($notificationKey))"
+                                    @click.stop="dismiss(@js($notificationKey))"
                                 >
                                     {{ data_get($notification, 'action_label', 'Open') }}
                                 </a>
@@ -130,7 +161,7 @@
                         <button
                             type="button"
                             class="text-gray-400 hover:text-gray-600"
-                            @click="dismiss(@js($notificationKey))"
+                            @click.stop="dismiss(@js($notificationKey))"
                             aria-label="Dismiss notification"
                         >
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

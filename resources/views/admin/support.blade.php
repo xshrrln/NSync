@@ -1,5 +1,6 @@
 @extends('layouts.admin')
 
 @section('content')
-    @livewire('admin.patches')
+    @livewire('admin.support-center')
 @endsection
+

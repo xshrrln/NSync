@@ -996,14 +996,12 @@ new class extends Component {
 
                     <div class="grid grid-cols-1 gap-5">
                         <div class="min-w-0 overflow-x-auto pb-4 [scrollbar-width:thin]">
-                            <div class="inline-flex min-w-max items-start gap-4 pr-2">
+                            <div class="inline-flex min-w-max items-start gap-6 pr-2">
                             @foreach($stages as $stage)
-                                <div class="w-[318px] flex-shrink-0 rounded-xl border border-slate-300 bg-white shadow-sm" x-data="{ open: false }" wire:key="stage-{{ $stage->id }}">
-                                    <div class="rounded-t-xl border-b border-nsync-green-200 px-3.5 py-3" style="background: linear-gradient(135deg, color-mix(in srgb, var(--tenant-primary) 12%, white 88%), color-mix(in srgb, var(--tenant-primary) 22%, white 78%));">
-                                        <div class="flex items-center justify-between gap-3">
-                                            <h2 class="truncate text-[17px] font-extrabold tracking-tight text-slate-800">{{ $stage->name }}</h2>
-                                            <span class="rounded-full border border-nsync-green-200 bg-white px-2.5 py-1 text-xs font-bold text-nsync-green-700">{{ $stage->tasks->count() }}</span>
-                                        </div>
+                                <div class="w-[360px] lg:w-[380px] flex-shrink-0 rounded-xl border border-slate-300 bg-white shadow-sm" x-data="{ open: false }" wire:key="stage-{{ $stage->id }}">
+                                    <div class="relative rounded-t-xl border-b border-nsync-green-200 px-3.5 py-3" style="background: linear-gradient(135deg, color-mix(in srgb, var(--tenant-primary) 12%, white 88%), color-mix(in srgb, var(--tenant-primary) 22%, white 78%));">
+                                        <h2 class="mx-auto max-w-[82%] truncate text-center text-[17px] font-extrabold tracking-tight text-slate-800">{{ $stage->name }}</h2>
+                                        <span class="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-full border border-nsync-green-200 bg-white px-2.5 py-1 text-xs font-bold text-nsync-green-700">{{ $stage->tasks->count() }}</span>
                                     </div>
 
                                     <div class="space-y-3 min-h-[320px] max-h-[calc(100vh-350px)] overflow-y-auto px-2.5 pb-2.5 pt-2.5"
@@ -1609,8 +1607,6 @@ new class extends Component {
         }
     }
 </style>
-
-
 
 
 

@@ -17,6 +17,10 @@ return [
                     'name' => 'Member Invites',
                     'description' => 'Invite teammates and assign roles.',
                 ],
+                'bulk-invites' => [
+                    'name' => 'Bulk Invites',
+                    'description' => 'Upload CSV/TXT/XLSX files to invite members in batches.',
+                ],
                 'role-permissions' => [
                     'name' => 'Role Permissions',
                     'description' => 'Granular permissions per role.',

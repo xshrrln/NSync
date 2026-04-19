@@ -35,7 +35,7 @@ new class extends Component {
         $tenant = app('currentTenant');
         $plans = collect(config('plans'));
 
-        $canViewReporting = $tenant ? ($tenant->hasFeature('advanced-reporting') || Auth::user()->hasRole('Team Supervisor')) : false;
+        $canViewReporting = $tenant ? $tenant->hasFeature('advanced-reporting') : false;
         $canExportAudit = $tenant ? $tenant->hasFeature('audit-export') : false;
 
         return [
@@ -55,7 +55,11 @@ new class extends Component {
     public function updatePlan($selectedPlan) {
         $this->authorizeAccess();
 
-        if (! in_array($selectedPlan, ['free', 'standard', 'pro'], true)) {
+        $availablePlans = array_keys((array) config('plans', []));
+        if ($availablePlans === []) {
+            $availablePlans = ['free', 'standard', 'pro'];
+        }
+        if (! in_array($selectedPlan, $availablePlans, true)) {
             return;
         }
 
@@ -113,32 +117,33 @@ new class extends Component {
 }; ?>
 
 <div class="bg-white min-h-screen">
-    <div class="w-full text-left">
-        @php
-            $currentPlanMeta = $plans->get(strtolower($tenant->plan ?? 'free'), []);
-            $membersLimit = $currentPlanMeta['members_limit'] ?? null;
-            $boardsLimit = $currentPlanMeta['boards_limit'] ?? null;
-            $storageLimit = $currentPlanMeta['storage_limit'] ?? null;
-            $includedFeatures = $tenant?->enabledFeatures() ?? ($currentPlanMeta['features'] ?? []);
-            $featureMeta = collect(config('features.categories', []))
-                ->pluck('features')
-                ->flatten(1);
-            $displayOverrides = [
-                'basic-kanban' => ($tenant?->plan === 'pro') ? 'Advanced Kanban Workspace' : null,
-                'basic-analytics' => ($tenant?->plan === 'pro') ? 'Advanced Analytics Suite' : null,
-            ];
-        @endphp
+    @php
+        $currentPlanMeta = $plans->get(strtolower($tenant->plan ?? 'free'), []);
+        $membersLimit = $currentPlanMeta['members_limit'] ?? null;
+        $boardsLimit = $currentPlanMeta['boards_limit'] ?? null;
+        $storageLimit = $currentPlanMeta['storage_limit'] ?? null;
+        $includedFeatures = $tenant?->enabledFeatures() ?? ($currentPlanMeta['features'] ?? []);
+        $featureMeta = collect(config('features.categories', []))
+            ->pluck('features')
+            ->flatten(1);
+        $displayOverrides = [];
+    @endphp
 
-        <div class="mb-8 flex items-center justify-between">
-            <div>
-                <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-nsync-green-600">Workspace Billing</span>
-                <h1 class="text-2xl font-bold text-gray-900 mb-0">Plan, Usage, and Payment Details</h1>
-                <p class="text-gray-600 mb-0">View your workspace subscription, included limits, and billing information.</p>
-            </div>
-            <div>
-                <span class="rounded-full border border-nsync-green-100 bg-nsync-green-50 px-3 py-1 text-[10px] font-bold uppercase text-nsync-green-600">Tenant</span>
+    <div class="bg-white shadow-sm border-b sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex items-center justify-between py-4 min-h-[116px]">
+                <div>
+                    <h1 class="text-2xl font-bold mb-0" style="color: color-mix(in srgb, var(--tenant-primary) 88%, black 12%);">Plan, Usage, and Payment Details</h1>
+                    <p class="text-gray-600 mb-0">View your workspace subscription, included limits, and billing information.</p>
+                </div>
+                <div>
+                    <span class="rounded-full border border-nsync-green-100 bg-nsync-green-50 px-3 py-1 text-[10px] font-bold uppercase text-nsync-green-600">Tenant</span>
+                </div>
             </div>
         </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-6 py-8 text-left">
 
         <div class="space-y-8">
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -309,6 +314,3 @@ new class extends Component {
         </div>
     </div>
 </div>
-
-
-

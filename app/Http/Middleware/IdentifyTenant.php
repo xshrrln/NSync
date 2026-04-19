@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Jobs\CreateTenantDatabase;
 use App\Models\Tenant;
 use Closure;
 use Illuminate\Http\Request;
@@ -22,9 +21,10 @@ class IdentifyTenant
         }
 
         $host = strtolower($request->getHost());
+        $isCentralHost = $this->isCentralHost($host);
         $tenant = null;
 
-        if ($this->isCentralHost($host)) {
+        if ($isCentralHost) {
             // Central hosts can resolve tenant from authenticated user for direct dashboard use.
             if (auth()->check() && auth()->user()->tenant) {
                 $tenant = auth()->user()->tenant;
@@ -47,14 +47,26 @@ class IdentifyTenant
             return $next($request);
         }
 
-        // Ensure tenant database exists; create on demand if missing.
+        // Do not auto-provision tenant DB here. Provisioning is explicit in approval flow.
         $dbExists = DB::selectOne(
             'SELECT SCHEMA_NAME FROM information_schema.schemata WHERE SCHEMA_NAME = ?',
             [$tenant->database]
         );
 
         if (!$dbExists) {
-            (new CreateTenantDatabase($tenant))->handle();
+            Log::warning('Tenant database missing during request. Provisioning has not completed yet.', [
+                'tenant_id' => $tenant->id,
+                'tenant_domain' => $tenant->domain,
+                'tenant_database' => $tenant->database,
+            ]);
+
+            // Do not interrupt central-host pages (pending approval, profile, admin, etc.).
+            if ($isCentralHost) {
+                app()->instance('currentTenant', null);
+                return $next($request);
+            }
+
+            abort(503, 'Workspace is still being provisioned. Please try again in a moment.');
         }
 
         // Activate tenant connection for tenant-aware models.

@@ -20,46 +20,46 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎉 Your NSync Workspace is Ready!</h1>
+            <h1>Your NSync Workspace is Ready!</h1>
         </div>
-        
+
         <div class="content">
             <p>Hi <strong>{{ $tenant->tenant_admin }}</strong>,</p>
-            
-            <p>Congratulations! Your organization <strong>{{ $tenant->name }}</strong> workspace has been created and is now live!</p>
-            
+
+            <p>Congratulations! Your organization <strong>{{ $tenant->name }}</strong> workspace has been created and is now live.</p>
+
             <div class="instructions">
-                <p><strong>📍 How to Access Your Workspace:</strong></p>
+                <p><strong>How to access your workspace:</strong></p>
                 <p style="margin: 10px 0;">1. Visit your workspace URL: <a href="{{ $workspace_url }}" style="color: #0066cc; text-decoration: none;"><strong>{{ $workspace_url }}</strong></a></p>
                 <p style="margin: 10px 0;">2. Click the "Sign in" button</p>
                 <p style="margin: 10px 0;">3. Use the credentials below to log in</p>
                 <p style="margin: 10px 0;">4. Change your password on first login</p>
             </div>
-            
+
             <h3 style="color: {{ $theme['primary'] ?? '#16A34A' }};">Your Login Credentials:</h3>
-            
+
             <div class="credentials">
                 <div class="credentials-label">Workspace URL:</div>
                 <div class="credentials-value">{{ $workspace_url }}</div>
-                
+
                 <div class="credentials-label">Email Address:</div>
                 <div class="credentials-value">{{ $username }}</div>
-                
+
                 <div class="credentials-label">Temporary Password:</div>
                 <div class="credentials-value">{{ $password }}</div>
             </div>
-            
+
             <div style="text-align: center;">
-                <a href="{{ $login_url }}" class="button">Login to Your Workspace →</a>
+                <a href="{{ $login_url }}" class="button">Login to Your Workspace</a>
             </div>
-            
+
             <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px;">
-                <p style="margin: 5px 0;"><strong>💡 Tip:</strong> Make sure to change your temporary password after logging in for security.</p>
-                <p style="margin: 5px 0;"><strong>📋 Plan:</strong> {{ ucfirst($tenant->plan) }} Plan</p>
-                <p style="margin: 5px 0;"><strong>❓ Questions?</strong> Contact our support team if you need assistance.</p>
+                <p style="margin: 5px 0;"><strong>Tip:</strong> Change your temporary password after logging in for security.</p>
+                <p style="margin: 5px 0;"><strong>Plan:</strong> {{ ucfirst($tenant->plan) }} Plan</p>
+                <p style="margin: 5px 0;"><strong>Questions?</strong> Contact our support team if you need assistance.</p>
             </div>
         </div>
-        
+
         <div class="footer">
             <p>&copy; 2026 NSync. All rights reserved.</p>
             <p>This is an automated message. Please do not reply to this email.</p>
@@ -67,4 +67,3 @@
     </div>
 </body>
 </html>
-

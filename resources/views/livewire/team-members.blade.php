@@ -27,7 +27,9 @@ new class extends Component {
         $canManageMembers = auth()->user()?->hasRole('Team Supervisor') ?? false;
         $canInviteByPlan = $tenant ? $tenant->hasFeature('member-invites') : false;
         $canAssignSupervisorRole = $tenant ? $tenant->hasFeature('role-permissions') : false;
-        $canBulkInvite = strtolower((string) ($tenant?->plan ?? 'free')) === 'pro';
+        $canBulkInvite = $tenant
+            ? ($tenant->hasFeature('bulk-invites') || strtolower((string) $tenant->plan) === 'pro')
+            : false;
         $atMemberLimit = $tenant ? $tenant->hasReachedLimit('members') : false;
         $canInviteMembers = $canManageMembers && $canInviteByPlan && ! $atMemberLimit;
         
@@ -193,8 +195,8 @@ new class extends Component {
             return;
         }
 
-        if (strtolower((string) ($tenant->plan ?? 'free')) !== 'pro') {
-            $this->dispatch('notify', message: 'Bulk invite upload is available for Pro plan workspaces.', type: 'error');
+        if (! ($tenant->hasFeature('bulk-invites') || strtolower((string) $tenant->plan) === 'pro')) {
+            $this->dispatch('notify', message: 'Bulk invite upload is not available on your current plan.', type: 'error');
             return;
         }
 
@@ -511,7 +513,7 @@ new class extends Component {
         <div class="max-w-7xl mx-auto px-6">
             <div class="flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900 mb-0">Team Members</h1>
+                    <h1 class="text-2xl font-bold mb-0" style="color: color-mix(in srgb, var(--tenant-primary) 88%, black 12%);">Team Members</h1>
                     <p class="text-gray-600 mb-0">{{ $tenant?->users?->count() ?? 0 }} total members</p>
                 </div>
                 
@@ -643,7 +645,7 @@ new class extends Component {
 
                     @if($canBulkInvite)
                         <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Bulk Invite File (Pro)</label>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Bulk Invite File</label>
                             <input wire:model="inviteFile" type="file" accept=".csv,.txt,.xlsx" class="w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-nsync-green-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-nsync-green-700">
                             <p class="mt-2 text-xs text-gray-500">Upload CSV/TXT/XLSX with one email per cell or line. We will invite all valid emails at once.</p>
                             @error('inviteFile') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
@@ -668,7 +670,7 @@ new class extends Component {
                         </div>
                     @else
                         <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-                            Bulk invite upload is available for Pro plan workspaces.
+                            Bulk invite upload is not available on your current plan.
                         </div>
                     @endif
 

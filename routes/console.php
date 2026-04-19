@@ -51,8 +51,9 @@ Artisan::command('tenants:provision-missing {--rename}', function () {
     foreach ($missing as $tenant) {
         $needsName = blank($tenant->database) || $this->option('rename');
         if ($needsName) {
-            $slug = \Illuminate\Support\Str::slug($tenant->name ?? 'tenant', '_');
-            $tenant->updateQuietly(['database' => ($slug ?: 'tenant_'.$tenant->id) . '_nsync_db']);
+            $tenant->updateQuietly([
+                'database' => \App\Models\Tenant::generateDatabaseName($tenant->name, $tenant->id),
+            ]);
         }
 
         // If DB schema not present, CreateTenantDatabase will create and migrate
@@ -69,7 +70,7 @@ Artisan::command('tenants:provision-missing {--rename}', function () {
     }
 
     $this->info("Completed. Provisioned/verified {$created} tenant databases.");
-})->purpose('Backfill database-per-tenant for legacy tenants (optionally rename to *_nsync_db)');
+})->purpose('Backfill database-per-tenant for legacy tenants (optionally rename to obfuscated names)');
 
 Artisan::command('tenants:list-simple', function () {
     $rows = \App\Models\Tenant::select('id', 'name', 'domain', 'database')->get()->toArray();

@@ -39,6 +39,7 @@ return [
             'basic-kanban',
             'board-creation',
             'member-invites',
+            'bulk-invites',
             'role-permissions',
             'guest-boards',
             'task-checklists',

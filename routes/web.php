@@ -10,6 +10,14 @@ use Livewire\Volt\Volt;
 
 // 1. Pivot Logic: Fixed redirects to ensure users go to the correct home
 Route::get('/', function () {
+    $host = strtolower(request()->getHost());
+    $isLocalhost = in_array($host, ['localhost', '127.0.0.1'], true);
+
+    // Keep localhost stable: no automatic host-switch redirects.
+    if ($isLocalhost) {
+        return view('landing');
+    }
+
     if (Auth::check()) {
         $user = Auth::user();
         
@@ -17,9 +25,19 @@ Route::get('/', function () {
         if ($user->hasRole('Platform Administrator')) {
             return redirect(route('admin.dashboard'));
         }
-        
-        // Regular users go to their Tenant Workspace Dashboard
-        return redirect(route('dashboard'));
+
+        if (! $user->tenant) {
+            return redirect()->to(route('pending-approval', absolute: false));
+        }
+
+        $port = parse_url(config('app.url'), PHP_URL_PORT) ?: request()->getPort() ?: 8000;
+        $portSegment = $port && $port !== 80 && $port !== 443 ? ':' . $port : '';
+        $tenantHost = str_contains((string) $user->tenant->domain, '.')
+            ? $user->tenant->domain
+            : "{$user->tenant->domain}.localhost";
+
+        // Regular users should go to their own tenant workspace host.
+        return redirect()->to("http://{$tenantHost}{$portSegment}/dashboard");
     }
     // Force login when explicitly requested via query flag (for returning users/bookmarks)
     if (request()->boolean('login')) {
@@ -34,7 +52,7 @@ Route::view('/pending-approval', 'auth.pending-approval')->name('pending-approva
 
 // 2. Admin routes: register central dashboard before generic workspace routes so
 // nsync.localhost/dashboard resolves to the admin page instead of the tenant Volt page.
-Route::domain('nsync.localhost')->middleware(['auth', 'verified', 'role:Platform Administrator'])->get('/dashboard', function () {
+Route::domain('nsync.localhost')->middleware(['auth', 'verified', 'platform_admin'])->get('/dashboard', function () {
     $tenantsCount = \App\Models\Tenant::count();
     $pendingCount = \App\Models\Tenant::where('status', 'pending')->count();
     $activeCount = \App\Models\Tenant::where('status', 'active')->count();
@@ -43,7 +61,7 @@ Route::domain('nsync.localhost')->middleware(['auth', 'verified', 'role:Platform
     return view('admin.dashboard', compact('tenantsCount', 'pendingCount', 'activeCount', 'suspendedCount'));
 })->name('admin.dashboard');
 
-Route::domain('nsync.localhost')->middleware(['auth', 'verified', 'role:Platform Administrator'])->prefix('admin')->name('admin.')->group(function () {
+Route::domain('nsync.localhost')->middleware(['auth', 'verified', 'platform_admin'])->prefix('admin')->name('admin.')->group(function () {
     
     Route::get('/dashboard', function () {
         $tenantsCount = \App\Models\Tenant::count();
@@ -67,6 +85,7 @@ Route::domain('nsync.localhost')->middleware(['auth', 'verified', 'role:Platform
     // Admin utilities
     Route::view('/plans-manager', 'admin.plans-manager')->name('plans.manager');
     Route::view('/billing', 'admin.billing')->name('billing');
+    Route::view('/support', 'admin.support')->name('support.index');
     Route::view('/patches', 'admin.patches')->name('patches');
     Route::view('/archive', 'admin.archive')->name('archive');
     Route::get('/settings', [AdminSettingsController::class, 'edit'])->name('settings');
@@ -87,6 +106,7 @@ Route::middleware(['auth', 'verified', 'tenant', 'approved'])->group(function ()
     Volt::route('/team-members', 'team-members')->name('team-members');
     Volt::route('/chat', 'chat-window')->name('chat');
     Volt::route('/update-center', 'update-center')->name('update-center');
+    Volt::route('/support', 'support-center')->name('support');
     Volt::route('/billing', 'billing')->name('billing');
     Volt::route('/reports', 'reports')->name('reports');
     Volt::route('/team/invite', 'team-members')->name('team.invite');

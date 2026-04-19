@@ -74,11 +74,27 @@ new class extends Component {
 
     private function parsedSqlStatements(): array
     {
-        return collect(preg_split("/\r\n\s*\r\n|\n\s*\n|\r\s*\r/", $this->sqlStatements) ?: [])
+        $raw = trim((string) $this->sqlStatements);
+        if ($raw === '') {
+            return [];
+        }
+
+        // Preferred format: one or more SQL statements separated by semicolons.
+        $semicolonChunks = preg_split('/;\s*(?:\r\n|\n|\r|$)/', $raw) ?: [];
+        $statements = collect($semicolonChunks)
             ->map(fn ($statement) => trim((string) $statement))
             ->filter()
-            ->values()
-            ->all();
+            ->values();
+
+        // Backward-compatible fallback: legacy blank-line separated blocks.
+        if ($statements->isEmpty()) {
+            $statements = collect(preg_split("/\r\n\s*\r\n|\n\s*\n|\r\s*\r/", $raw) ?: [])
+                ->map(fn ($statement) => trim((string) $statement))
+                ->filter()
+                ->values();
+        }
+
+        return $statements->all();
     }
 };
 ?>
@@ -105,8 +121,8 @@ new class extends Component {
 
             <div>
                 <label class="mb-2 block text-sm font-semibold text-slate-700">Optional SQL Steps</label>
-                <textarea wire:model="sqlStatements" rows="8" class="w-full rounded-2xl border border-slate-200 px-4 py-3 font-mono text-sm focus:border-transparent focus:ring-2 focus:ring-nsync-green-500" placeholder="Enter one SQL statement block per paragraph. Leave empty for informational or code-only patches."></textarea>
-                <p class="mt-2 text-xs text-slate-500">Separate multiple SQL statements with a blank line so they are applied in order.</p>
+                <textarea wire:model="sqlStatements" rows="8" class="w-full rounded-2xl border border-slate-200 px-4 py-3 font-mono text-sm focus:border-transparent focus:ring-2 focus:ring-nsync-green-500" placeholder="Example: ALTER TABLE tasks ADD COLUMN is_blocked TINYINT(1) NOT NULL DEFAULT 0; UPDATE tasks SET is_blocked = 0 WHERE is_blocked IS NULL;"></textarea>
+                <p class="mt-2 text-xs text-slate-500">Use semicolons to separate SQL statements. Leave empty only if this patch is notification-only.</p>
                 @error('sqlStatements') <p class="mt-2 text-xs text-red-600">{{ $message }}</p> @enderror
             </div>
 
@@ -145,6 +161,5 @@ new class extends Component {
         </div>
     </div>
 </div>
-
 
 

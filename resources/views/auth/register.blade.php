@@ -1,6 +1,7 @@
 @php
+    $plans = is_array($plans ?? null) ? $plans : [];
     $selectedPlanKey = old('plan', $prefill['plan'] ?? request()->query('plan', 'free'));
-    $selectedPlan = $plans[$selectedPlanKey] ?? reset($plans);
+    $selectedPlan = $plans[$selectedPlanKey] ?? (count($plans) > 0 ? reset($plans) : []);
     $selectedPlanName = $selectedPlan['name'] ?? ucfirst((string) $selectedPlanKey);
     $selectedPlanPrice = $selectedPlan['price'] ?? '';
     $selectedPlanMembers = $selectedPlan['members_limit'] ?? null;

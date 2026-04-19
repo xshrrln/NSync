@@ -66,9 +66,9 @@ class TaskPolicy
 
     public function billing(User $user): bool
     {
-        $tenant = app('currentTenant') ?? $user->tenant;
+        $tenant = app()->has('currentTenant') ? app('currentTenant') : $user->tenant;
         return $tenant
-            && ($user->hasRole('Team Supervisor') || $tenant->hasFeature('advanced-reporting'));
+            && ! $tenant->requiresSubscriptionRenewal()
+            && $user->hasRole('Team Supervisor');
     }
 }
-

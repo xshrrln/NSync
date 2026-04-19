@@ -5,6 +5,7 @@ namespace App\Mail;
 use App\Models\Tenant;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -24,16 +25,25 @@ class TenantApproved extends Mailable
 
     public function envelope(): Envelope
     {
+        $fromAddress = (string) (config('mail.mailers.smtp.username') ?: config('mail.from.address'));
+        $fromName = (string) config('mail.from.name', config('app.name', 'NSync'));
+
         return new Envelope(
-            subject: 'Your NSync Workspace is Ready! 🎉',
+            subject: 'Your NSync Workspace is Ready!',
+            from: new Address($fromAddress, $fromName),
         );
     }
 
     public function content(): Content
     {
-$loginUrl = 'http://' . $this->tenant->domain . ':8000/login';
-$workspaceUrl = 'http://' . $this->tenant->domain . ':8000';
-        
+        $appUrl = (string) config('app.url', 'http://localhost:8000');
+        $parts = parse_url($appUrl);
+        $scheme = $parts['scheme'] ?? 'http';
+        $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+
+        $workspaceUrl = $scheme . '://' . $this->tenant->domain . $port;
+        $loginUrl = $workspaceUrl . '/login';
+
         return new Content(
             view: 'emails.tenant-approved',
             with: [
@@ -42,9 +52,10 @@ $workspaceUrl = 'http://' . $this->tenant->domain . ':8000';
                 'workspace_url' => $workspaceUrl,
                 'username' => $this->tenant->tenant_admin_email,
                 'password' => $this->temporaryPassword,
-                'theme' => is_array($this->tenant->theme) ? $this->tenant->theme : json_decode($this->tenant->getRawOriginal('theme') ?? '{}', true) ?? ['primary' => '#16A34A', 'secondary' => '#10B981'],
+                'theme' => is_array($this->tenant->theme)
+                    ? $this->tenant->theme
+                    : json_decode($this->tenant->getRawOriginal('theme') ?? '{}', true) ?? ['primary' => '#16A34A', 'secondary' => '#10B981'],
             ]
         );
     }
 }
-

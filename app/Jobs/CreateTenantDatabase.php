@@ -8,7 +8,6 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Schema;
 use Spatie\Multitenancy\Jobs\NotTenantAware;
 
@@ -38,8 +37,8 @@ class CreateTenantDatabase implements ShouldQueue, NotTenantAware
     {
         try {
             // Build database name if missing
-            $slug = Str::slug($this->tenant->name ?? 'tenant', '_');
-            $databaseName = $this->tenant->database ?: ($slug ?: 'tenant_'.$this->tenant->id) . '_nsync_db';
+            $databaseName = $this->tenant->database
+                ?: Tenant::generateDatabaseName($this->tenant->name, $this->tenant->id);
 
             if ($this->tenant->database !== $databaseName) {
                 $this->tenant->updateQuietly(['database' => $databaseName]);

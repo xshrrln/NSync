@@ -5,10 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\Models\Role;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Models\AppSetting;
 use Illuminate\Support\Carbon;
+use Throwable;
 
 class TenantController extends Controller
 {
@@ -56,26 +59,55 @@ class TenantController extends Controller
     {
         $this->authorize('approve', $tenant);
 
-        // Dispatch job to create tenant database and run migrations
-        dispatch(new \App\Jobs\CreateTenantDatabase($tenant));
-
         // Generate temporary password
         $temporaryPassword = \Str::random(12);
-        
-        // Update tenant status
-        $tenant->update(['status' => 'active']);
 
-        // Set password for the tenant admin user
-        $tenant->users()->first()?->update([
-            'password' => \Hash::make($temporaryPassword)
-        ]);
-
-        // Send approval email with credentials
         try {
-            \Mail::to($tenant->tenant_admin_email)->send(new \App\Mail\TenantApproved($tenant, $temporaryPassword));
-        } catch (\Exception $e) {
-            // Log mail error but don't fail approval
-            \Log::warning('Approval email failed to send: ' . $e->getMessage());
+            DB::transaction(function () use ($tenant, $temporaryPassword) {
+                $tenant->refresh();
+
+                $tenantAdmin = $tenant->users()->first();
+                if (! $tenantAdmin) {
+                    throw new \RuntimeException('Tenant admin user not found for approval flow.');
+                }
+
+                $tenantAdmin->update([
+                    'password' => \Hash::make($temporaryPassword),
+                ]);
+
+                $emailSent = $this->sendTenantEmail(
+                    $tenant->tenant_admin_email,
+                    new \App\Mail\TenantApproved($tenant, $temporaryPassword),
+                    'tenant_approval_credentials',
+                    $tenant
+                );
+
+                if (! $emailSent) {
+                    throw new \RuntimeException('Credentials email delivery failed during tenant approval.');
+                }
+
+                $tenant->update(['status' => 'active']);
+            });
+        } catch (Throwable $exception) {
+            Log::warning('Tenant approval aborted.', [
+                'tenant_id' => $tenant->id,
+                'tenant_name' => $tenant->name,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return back()->with('warning', 'Tenant approval was not completed because credentials email could not be sent. No tenant database was provisioned.');
+        }
+
+        try {
+            dispatch(new \App\Jobs\CreateTenantDatabase($tenant->fresh()));
+        } catch (Throwable $exception) {
+            Log::error('Tenant database provisioning dispatch failed after approval.', [
+                'tenant_id' => $tenant->id,
+                'tenant_name' => $tenant->name,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return back()->with('warning', 'Tenant credentials were sent and status is active, but tenant database provisioning could not start. Please retry provisioning.');
         }
 
         return back()->with('success', 'Tenant approved! Database creation in progress. Credentials email sent to ' . $tenant->tenant_admin_email);
@@ -88,14 +120,18 @@ class TenantController extends Controller
         // Update status to disabled
         $tenant->update(['status' => 'disabled']);
 
-        // Send rejection email
-        try {
-            \Mail::to($tenant->tenant_admin_email)->send(new \App\Mail\TenantRejected($tenant));
-        } catch (\Exception $e) {
-            \Log::warning('Rejection email failed to send: ' . $e->getMessage());
+        $emailSent = $this->sendTenantEmail(
+            $tenant->tenant_admin_email,
+            new \App\Mail\TenantRejected($tenant),
+            'tenant_rejection',
+            $tenant
+        );
+
+        if ($emailSent) {
+            return back()->with('success', 'Tenant registration rejected. Notification email sent to ' . $tenant->tenant_admin_email);
         }
 
-        return back()->with('success', 'Tenant registration rejected. Notification email sent to ' . $tenant->tenant_admin_email);
+        return back()->with('warning', 'Tenant registration rejected, but rejection email could not be delivered. Please verify mail settings.');
     }
 
     public function index()
@@ -237,13 +273,18 @@ class TenantController extends Controller
         $reason = $request->input('reason', 'Administrative suspension');
         $tenant->update(['status' => 'disabled']);
 
-        try {
-            \Mail::to($tenant->tenant_admin_email)->send(new \App\Mail\TenantSuspended($tenant, $reason));
-        } catch (\Exception $e) {
-            \Log::warning('Suspension email failed: ' . $e->getMessage());
+        $emailSent = $this->sendTenantEmail(
+            $tenant->tenant_admin_email,
+            new \App\Mail\TenantSuspended($tenant, $reason),
+            'tenant_suspension',
+            $tenant
+        );
+
+        if ($emailSent) {
+            return back()->with('success', "Tenant '{$tenant->name}' suspended. Notification sent.");
         }
 
-        return back()->with('success', "Tenant '{$tenant->name}' suspended. Notification sent.");
+        return back()->with('warning', "Tenant '{$tenant->name}' suspended, but suspension email could not be delivered.");
     }
 
     public function resume(Tenant $tenant)
@@ -259,8 +300,12 @@ class TenantController extends Controller
     {
         $this->authorize('update', $tenant);
 
+        $availablePlans = array_keys((array) config('plans', []));
+        if ($availablePlans === []) {
+            $availablePlans = ['free', 'standard', 'pro'];
+        }
         $request->validate([
-            'plan' => 'required|in:free,standard,pro'
+            'plan' => ['required', 'string', 'in:' . implode(',', $availablePlans)]
         ]);
 
         $oldPlan = $tenant->plan;
@@ -283,5 +328,68 @@ class TenantController extends Controller
     private function planDurationDays(string $plan): int
     {
         return strtolower($plan) === 'free' ? 14 : 30;
+    }
+
+    /**
+     * Attempt to send tenant mail via available mailers and report real delivery status.
+     */
+    private function sendTenantEmail(?string $recipient, object $mailable, string $event, Tenant $tenant): bool
+    {
+        $recipient = trim((string) $recipient);
+        if ($recipient === '') {
+            Log::warning('Tenant mail skipped: missing recipient email.', [
+                'event' => $event,
+                'tenant_id' => $tenant->id,
+                'tenant_name' => $tenant->name,
+            ]);
+
+            return false;
+        }
+
+        $mailersToTry = array_values(array_unique(array_filter([
+            config('mail.default'),
+            'smtp',
+            'failover',
+        ], fn ($value) => is_string($value) && trim($value) !== '')));
+
+        $lastError = null;
+
+        foreach ($mailersToTry as $mailer) {
+            try {
+                Mail::mailer($mailer)->to($recipient)->send($mailable);
+
+                Log::info('Tenant mail sent.', [
+                    'event' => $event,
+                    'tenant_id' => $tenant->id,
+                    'tenant_name' => $tenant->name,
+                    'recipient' => $recipient,
+                    'mailer' => $mailer,
+                ]);
+
+                return true;
+            } catch (Throwable $exception) {
+                $lastError = $exception;
+
+                Log::warning('Tenant mail send attempt failed.', [
+                    'event' => $event,
+                    'tenant_id' => $tenant->id,
+                    'tenant_name' => $tenant->name,
+                    'recipient' => $recipient,
+                    'mailer' => $mailer,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        Log::error('Tenant mail failed after all mailers.', [
+            'event' => $event,
+            'tenant_id' => $tenant->id,
+            'tenant_name' => $tenant->name,
+            'recipient' => $recipient,
+            'mailers_tried' => $mailersToTry,
+            'last_error' => $lastError?->getMessage(),
+        ]);
+
+        return false;
     }
 }

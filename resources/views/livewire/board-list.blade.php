@@ -634,7 +634,7 @@ new class extends Component {
         <div class="max-w-7xl mx-auto px-6">
             <div class="flex items-center justify-between gap-4 py-4">
                 <div class="flex-1">
-                    <h1 class="text-2xl font-bold text-gray-900 mb-0">Boards</h1>
+                    <h1 class="text-2xl font-bold mb-0" style="color: color-mix(in srgb, var(--tenant-primary) 88%, black 12%);">Boards</h1>
                     <p class="text-gray-600 mb-0">Manage and organize your project boards</p>
                 </div>
 

@@ -126,23 +126,23 @@ new class extends Component {
 
 <div class="bg-white min-h-screen">
     <div class="max-w-5xl mx-auto space-y-8">
-        <div class="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-nsync-green-700 px-8 py-10 text-white shadow-xl">
+        <div class="rounded-3xl border border-slate-200 px-8 py-10 shadow-xl" style="background-color: color-mix(in srgb, var(--tenant-secondary) 88%, white 12%); border-color: color-mix(in srgb, var(--tenant-primary) 18%, white 82%);">
             <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <p class="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">Update Center</p>
-                    <h1 class="mt-3 text-3xl font-black tracking-tight">Choose when your workspace takes new patches</h1>
-                    <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-200">
+                    <p class="text-xs font-bold uppercase tracking-[0.25em]" style="color: color-mix(in srgb, var(--tenant-primary) 82%, black 18%);">Update Center</p>
+                    <h1 class="mt-3 text-3xl font-black tracking-tight text-slate-900">Choose when your workspace takes new patches</h1>
+                    <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
                         New patches published by the platform team appear here first. Your tenant admin decides when to apply them.
                     </p>
                 </div>
                 <div class="grid grid-cols-2 gap-3 text-center">
-                    <div class="rounded-2xl bg-white/10 px-5 py-4 backdrop-blur">
-                        <div class="text-3xl font-black">{{ $pendingCount }}</div>
-                        <div class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-200">Pending</div>
+                    <div class="rounded-2xl bg-white px-5 py-4" style="border: 1px solid color-mix(in srgb, var(--tenant-primary) 18%, white 82%);">
+                        <div class="text-3xl font-black text-slate-900">{{ $pendingCount }}</div>
+                        <div class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Pending</div>
                     </div>
-                    <div class="rounded-2xl bg-white/10 px-5 py-4 backdrop-blur">
-                        <div class="text-3xl font-black">{{ count($appliedPatchIds) }}</div>
-                        <div class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-200">Applied</div>
+                    <div class="rounded-2xl bg-white px-5 py-4" style="border: 1px solid color-mix(in srgb, var(--tenant-primary) 18%, white 82%);">
+                        <div class="text-3xl font-black text-slate-900">{{ count($appliedPatchIds) }}</div>
+                        <div class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Applied</div>
                     </div>
                 </div>
             </div>
@@ -160,12 +160,18 @@ new class extends Component {
                     $isApplied = in_array($patch->id, $appliedPatchIds, true);
                     $sqlCount = count($patch->sql_migrations ?? []);
                 @endphp
-                <div class="rounded-3xl border {{ $isApplied ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200 bg-white' }} p-6 shadow-sm">
+                <div
+                    class="rounded-3xl border p-6 shadow-sm {{ $isApplied ? '' : 'border-slate-200 bg-white' }}"
+                    style="{{ $isApplied ? 'border-color: color-mix(in srgb, var(--tenant-primary) 20%, white 80%); background-color: color-mix(in srgb, var(--tenant-secondary) 86%, white 14%);' : '' }}"
+                >
                     <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                         <div class="space-y-3">
                             <div class="flex flex-wrap items-center gap-3">
                                 <h2 class="text-xl font-bold text-slate-900">{{ $patch->title }}</h2>
-                                <span class="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide {{ $isApplied ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">
+                                <span
+                                    class="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide {{ $isApplied ? '' : 'bg-amber-100 text-amber-700' }}"
+                                    style="{{ $isApplied ? 'background-color: color-mix(in srgb, var(--tenant-primary) 12%, white 88%); color: color-mix(in srgb, var(--tenant-primary) 84%, black 16%);' : '' }}"
+                                >
                                     {{ $isApplied ? 'Applied' : 'Pending' }}
                                 </span>
                                 <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -183,7 +189,7 @@ new class extends Component {
 
                         <div class="flex flex-col gap-3 lg:min-w-44">
                             @if($isApplied)
-                                <button type="button" disabled class="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm">
+                                <button type="button" disabled class="rounded-2xl bg-nsync-green-600 px-5 py-3 text-sm font-bold text-white shadow-sm">
                                     Applied
                                 </button>
                             @elseif($canApplyUpdates)

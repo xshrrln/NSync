@@ -6,6 +6,7 @@ use Spatie\Multitenancy\Models\Tenant as BaseTenant;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use App\Models\Board;
 use App\Models\User;
 
@@ -24,6 +25,18 @@ class Tenant extends BaseTenant
         'actions' => 'array',
         'billing_data' => 'array',
     ];
+
+    /**
+     * Generate a readable tenant database name: "{workspace}_nsync_db".
+     */
+    public static function generateDatabaseName(?string $tenantName, int|string|null $tenantId = null): string
+    {
+        $slug = Str::slug((string) ($tenantName ?? 'tenant'), '_');
+        $base = $slug !== '' ? $slug : ('tenant_' . ((string) ($tenantId ?? '0')));
+
+        // Keep within MySQL database name limits and safe characters.
+        return substr($base . '_nsync_db', 0, 64);
+    }
 
     public function planConfig(): array
     {

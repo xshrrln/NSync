@@ -38,7 +38,7 @@ class PlanSeeder extends Seeder
                 'members_limit' => 9999,
                 'boards_limit' => 9999,
                 'storage_limit' => 999999,
-                'features' => ['basic-kanban', 'board-creation', 'member-invites', 'role-permissions', 'guest-boards', 'task-checklists', 'file-attachments', 'due-date-reminders', 'unlimited-boards', 'basic-analytics', 'advanced-reporting', 'activity-logs', 'two-factor', 'audit-export'],
+                'features' => ['basic-kanban', 'board-creation', 'member-invites', 'bulk-invites', 'role-permissions', 'guest-boards', 'task-checklists', 'file-attachments', 'due-date-reminders', 'unlimited-boards', 'basic-analytics', 'advanced-reporting', 'activity-logs', 'two-factor', 'audit-export'],
             ],
         ];
 
@@ -50,4 +50,3 @@ class PlanSeeder extends Seeder
         }
     }
 }
-

@@ -1,11 +1,18 @@
 <?php
 use Livewire\Volt\Component;
+use Livewire\WithFileUploads;
+use App\Models\AppSetting;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 new class extends Component {
+    use WithFileUploads;
+
     public $email;
     public $name;
+    public $avatar;
+    public $avatarUrl = null;
     public $current_password;
     public $password;
     public $password_confirmation;
@@ -19,22 +26,8 @@ new class extends Component {
     public string $twoFactorScope = 'all_members';
     public string $twoFactorFrequency = 'new_device';
     public int $twoFactorCodeTtlMinutes = 10;
-    public $primaryOptions = [
-        '#16A34A', // green
-        '#34D399', // light emerald
-        '#60A5FA', // light blue
-        '#FBBF24', // light orange/amber
-        '#F472B6', // light pink
-        '#F87171', // light red
-        '#9CA3AF', // light gray
-    ];
-    public $secondaryOptions = [
-        '#F8FAFC', // slate-50
-        '#ECFEFF', // cyan-50
-        '#FFF7ED', // orange-50
-        '#FEF2F2', // rose-50
-        '#F3F4F6', // gray-100
-    ];
+    public $primaryOptions = ['#16A34A', '#34D399', '#60A5FA', '#FBBF24', '#F472B6', '#F87171', '#9CA3AF'];
+    public $secondaryOptions = ['#FFFFFF', '#F8FAFC', '#ECFEFF', '#FFF7ED', '#FEF2F2', '#F3F4F6'];
 
     private function ensureSubscriptionAccess(string $title = 'Subscription Required'): bool
     {
@@ -49,9 +42,31 @@ new class extends Component {
         return false;
     }
 
+    private function canUploadProfileAvatar(): bool
+    {
+        $tenant = app()->bound('currentTenant') ? app('currentTenant') : null;
+
+        // Non-tenant contexts are not restricted by tenant plan features.
+        if (! $tenant) {
+            return true;
+        }
+
+        return $tenant->hasFeature('file-attachments');
+    }
+
     public function mount() {
+        $this->primaryOptions = $this->normalizeHexOptions(
+            AppSetting::get('theme_primary_options', $this->primaryOptions),
+            $this->primaryOptions
+        );
+        $this->secondaryOptions = $this->normalizeHexOptions(
+            AppSetting::get('theme_secondary_options', $this->secondaryOptions),
+            $this->secondaryOptions
+        );
+
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->avatarUrl = Auth::user()->avatar;
         
         // Get tenant theme if exists
         if (app()->has('currentTenant')) {
@@ -59,10 +74,10 @@ new class extends Component {
             $theme = $tenant->theme;
             $this->primaryColor = in_array($theme['primary'] ?? '', $this->primaryOptions, true)
                 ? $theme['primary']
-                : '#16A34A';
+                : $this->primaryOptions[0];
             $this->secondaryColor = in_array($theme['secondary'] ?? '', $this->secondaryOptions, true)
                 ? $theme['secondary']
-                : '#F8FAFC';
+                : $this->secondaryOptions[0];
 
             if ($tenant->hasFeature('two-factor')) {
                 $twoFactor = $tenant->twoFactorSettings();
@@ -75,8 +90,41 @@ new class extends Component {
     }
 
     public function updateProfile() {
-        $this->validate(['name' => 'required|string|max:255', 'email' => 'required|email|max:255']);
-        Auth::user()->update(['name' => $this->name, 'email' => $this->email]);
+        if ($this->avatar && ! $this->canUploadProfileAvatar()) {
+            $this->reset('avatar');
+            $this->addError('avatar', 'Profile photo upload is available on Standard and Pro plans only.');
+            return;
+        }
+
+        $this->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'avatar' => 'nullable|image|max:2048',
+        ], [
+            'avatar.uploaded' => 'Avatar upload did not complete. Please wait for upload to finish, then try again.',
+            'avatar.image' => 'The profile photo must be a valid image.',
+            'avatar.max' => 'The profile photo must not exceed 2MB.',
+        ]);
+
+        $user = Auth::user();
+        $payload = [
+            'name' => $this->name,
+            'email' => $this->email,
+        ];
+
+        if ($this->avatar) {
+            $existingAvatar = (string) ($user->avatar ?? '');
+            if ($existingAvatar !== '' && str_starts_with($existingAvatar, 'avatars/')) {
+                Storage::disk('public')->delete($existingAvatar);
+            }
+
+            $path = $this->avatar->store('avatars', 'public');
+            $payload['avatar'] = $path;
+            $this->avatarUrl = $path;
+            $this->reset('avatar');
+        }
+
+        $user->update($payload);
         $this->dispatch('notify', 'Profile updated!');
     }
 
@@ -93,10 +141,10 @@ new class extends Component {
         }
 
         if (!in_array($this->primaryColor, $this->primaryOptions, true)) {
-            $this->primaryColor = '#16A34A';
+            $this->primaryColor = $this->primaryOptions[0] ?? '#16A34A';
         }
         if (!in_array($this->secondaryColor, $this->secondaryOptions, true)) {
-            $this->secondaryColor = '#F8FAFC';
+            $this->secondaryColor = $this->secondaryOptions[0] ?? '#FFFFFF';
         }
 
         if (app()->has('currentTenant')) {
@@ -165,15 +213,36 @@ new class extends Component {
         $user->delete();
         return redirect()->to('/');
     }
+
+    private function normalizeHexOptions(mixed $value, array $fallback): array
+    {
+        $options = is_array($value) ? $value : [];
+
+        $normalized = collect($options)
+            ->map(fn ($item) => strtoupper(trim((string) $item)))
+            ->map(function (string $hex): ?string {
+                if (!str_starts_with($hex, '#')) {
+                    $hex = '#' . $hex;
+                }
+
+                return preg_match('/^#[0-9A-F]{6}$/', $hex) ? $hex : null;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return $normalized !== [] ? $normalized : $fallback;
+    }
 }; ?>
 
-<div class="py-5 bg-white min-h-screen">
+<div class="bg-white min-h-screen">
     <!-- Header -->
     <div class="bg-white shadow-sm border-b sticky top-0 z-30">
         <div class="max-w-7xl mx-auto px-6">
             <div class="flex items-center py-4">
                 <div class="flex-1">
-                    <h1 class="text-2xl font-bold text-gray-900 mb-0">Settings</h1>
+                    <h1 class="text-2xl font-bold mb-0" style="color: color-mix(in srgb, var(--tenant-primary) 88%, black 12%);">Settings</h1>
                     <p class="text-gray-600 mb-0">Manage your account and preferences</p>
                 </div>
             </div>
@@ -181,7 +250,7 @@ new class extends Component {
     </div>
 
     <!-- Main Content -->
-        <div class="mx-auto max-w-2xl px-6 py-8 space-y-8">
+        <div class="mx-auto max-w-7xl px-6 py-8 space-y-8">
             <!-- Profile Section -->
             <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-8">
                 <div class="mb-6">
@@ -189,7 +258,58 @@ new class extends Component {
                     <p class="text-gray-600 text-base mt-2">Update your personal details</p>
                 </div>
 
-                <div class="space-y-6">
+                <div class="space-y-6"
+                     x-data="{ uploadingAvatar: false, avatarUploadProgress: 0 }"
+                     x-on:livewire-upload-start="uploadingAvatar = true"
+                     x-on:livewire-upload-finish="uploadingAvatar = false; avatarUploadProgress = 0"
+                     x-on:livewire-upload-error="uploadingAvatar = false"
+                     x-on:livewire-upload-progress="avatarUploadProgress = $event.detail.progress">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Profile Photo</label>
+                        <div class="flex items-center gap-4">
+                            @php
+                                $avatarSrc = null;
+                                if (filled($avatarUrl ?? null)) {
+                                    $avatarSrc = str_starts_with((string) $avatarUrl, 'http')
+                                        ? $avatarUrl
+                                        : Storage::url((string) $avatarUrl);
+                                }
+                            @endphp
+                            @if($avatar)
+                                <img src="{{ $avatar->temporaryUrl() }}" alt="Avatar preview" class="h-14 w-14 rounded-full object-cover border border-gray-200">
+                            @elseif($avatarSrc)
+                                <img src="{{ $avatarSrc }}" alt="Profile avatar" class="h-14 w-14 rounded-full object-cover border border-gray-200">
+                            @else
+                                <div class="h-14 w-14 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-500 text-sm font-bold">
+                                    {{ strtoupper(substr($name ?: (Auth::user()->name ?? 'U'), 0, 2)) }}
+                                </div>
+                            @endif
+
+                            <div class="flex-1">
+                                @if($this->canUploadProfileAvatar())
+                                <input type="file"
+                                       wire:model="avatar"
+                                       wire:loading.attr="disabled"
+                                       wire:target="avatar"
+                                       accept="image/*"
+                                       class="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-nsync-green-600 file:px-3 file:py-2 file:font-semibold file:text-white hover:file:bg-nsync-green-700 disabled:opacity-60">
+                                <p class="mt-1 text-xs text-gray-500">JPG, PNG, GIF, WEBP up to 2MB.</p>
+                                @else
+                                <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                    Profile photo upload is locked on Free plan. Upgrade to Standard or Pro to enable attachments and avatar uploads.
+                                </div>
+                                @endif
+                                <div x-show="uploadingAvatar" x-cloak class="mt-2">
+                                    <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                                        <div class="h-full bg-nsync-green-600 transition-all duration-200" :style="`width: ${avatarUploadProgress}%`"></div>
+                                    </div>
+                                    <p class="mt-1 text-xs text-gray-500">Uploading photo... <span x-text="avatarUploadProgress"></span>%</p>
+                                </div>
+                                @error('avatar') <span class="text-red-600 text-xs mt-1">{{ $message }}</span> @enderror
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
                         <input type="text" wire:model="name" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-nsync-green-500 focus:border-transparent transition text-base" placeholder="Your name" />
@@ -202,7 +322,14 @@ new class extends Component {
                         @error('email') <span class="text-red-600 text-xs mt-1">{{ $message }}</span> @enderror
                     </div>
 
-                    <button wire:click="updateProfile" class="px-6 py-2 bg-nsync-green-600 text-white font-medium rounded-lg hover:bg-nsync-green-700 transition">Save Changes</button>
+                    <button wire:click="updateProfile"
+                            wire:loading.attr="disabled"
+                            wire:target="avatar,updateProfile"
+                            x-bind:disabled="uploadingAvatar"
+                            class="px-6 py-2 bg-nsync-green-600 text-white font-medium rounded-lg hover:bg-nsync-green-700 transition disabled:cursor-not-allowed disabled:opacity-60">
+                        <span wire:loading.remove wire:target="updateProfile">Save Changes</span>
+                        <span wire:loading wire:target="updateProfile">Saving...</span>
+                    </button>
                 </div>
             </div>
 
@@ -397,7 +524,3 @@ new class extends Component {
         </div>
     @endif
 </div>
-
-
-
-

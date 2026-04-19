@@ -28,15 +28,16 @@ class EnsureTenantApproved
 
         $user = auth()->user();
         $host = strtolower($request->getHost());
-        
-        // Allow Platform Administrators on nsync.localhost /dashboard (new admin landing)
-        if (($user->email === 'admin@nsync.com' || $user->hasRole('Platform Administrator')) 
-            && $host === 'nsync.localhost' && $request->is('dashboard')) {
-            return $next($request);
-        }
-        
-        if ($user->email === 'admin@nsync.com' || $user->hasRole('Platform Administrator')) {
-            return $next($request);
+
+        $isPlatformAdmin = $user->email === 'admin@nsync.com' || $user->hasRole('Platform Administrator');
+        if ($isPlatformAdmin) {
+            // Central app only for platform admins.
+            if ($host === 'nsync.localhost') {
+                return $next($request);
+            }
+
+            return redirect()->route('admin.dashboard')
+                ->with('error', 'Global admins access central dashboard only.');
         }
 
         $host = strtolower($request->getHost());
@@ -52,12 +53,6 @@ class EnsureTenantApproved
             return redirect()->to("http://{$user->tenant->domain}{$portSegment}/dashboard");
         }
         
-        // Block Platform Administrator from tenant routes entirely
-        if ($user->hasRole('Platform Administrator')) {
-            return redirect()->route('admin.dashboard')
-                ->with('error', 'Global admins access central dashboard only.');
-        }
-
         $tenant = app()->bound('currentTenant') ? app('currentTenant') : null;
 
         // If currentTenant is missing or null, fallback to authenticated user's tenant.
