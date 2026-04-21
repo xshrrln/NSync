@@ -1,5 +1,0 @@
-@extends('layouts.admin')
-
-@section('content')
-    @livewire('admin.patches')
-@endsection

@@ -27,10 +27,10 @@
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <a href="{{ route('admin.patches') }}" class="rounded-2xl border border-green-200 bg-green-50 px-6 py-5 transition hover:bg-green-100">
+        <a href="{{ app(\App\Support\GitHubReleaseService::class)->repositoryUrl() . '/releases' }}" target="_blank" rel="noopener" class="rounded-2xl border border-green-200 bg-green-50 px-6 py-5 transition hover:bg-green-100">
             <p class="text-xs font-bold uppercase tracking-widest text-green-700">Central Updates</p>
-            <h3 class="mt-1 text-lg font-black text-gray-900">Create Patch</h3>
-            <p class="mt-1 text-sm text-gray-600">Publish a patch and notify tenant admins in one step.</p>
+            <h3 class="mt-1 text-lg font-black text-gray-900">GitHub Releases</h3>
+            <p class="mt-1 text-sm text-gray-600">Create releases in GitHub so tenant workspaces receive the new version feed.</p>
         </a>
         <a href="{{ route('admin.support.index') }}" class="rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5 transition hover:bg-slate-100">
             <p class="text-xs font-bold uppercase tracking-widest text-slate-600">Tenant Assistance</p>

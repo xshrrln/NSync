@@ -39,7 +39,17 @@ return [
         ],
     ],
 
-'slack' => [
+    'github' => [
+        'releases' => [
+            'repository' => env('GITHUB_RELEASE_REPOSITORY', 'xshrrln/NSync'),
+            'token' => env('GITHUB_RELEASE_TOKEN'),
+            'cache_minutes' => env('GITHUB_RELEASE_CACHE_MINUTES', 10),
+            'timeout' => env('GITHUB_RELEASE_TIMEOUT', 5),
+            'fallback_version' => env('APP_VERSION', 'v0.0.0'),
+        ],
+    ],
+
+    'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),

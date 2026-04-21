@@ -11,6 +11,11 @@
 @php
     $authUser = auth()->user();
     $currentTenant = app()->bound('currentTenant') ? app('currentTenant') : null;
+    $releaseService = app(\App\Support\GitHubReleaseService::class);
+    $latestRelease = $releaseService->latest();
+    $latestVersion = $releaseService->latestVersion();
+    $appliedVersion = (string) ($currentTenant?->applied_release_version ?: $latestVersion);
+    $hasPendingRelease = $currentTenant && $latestRelease && $latestRelease['tag_name'] !== $appliedVersion;
     $theme = is_array($currentTenant?->theme) ? $currentTenant->theme : [];
     $defaultTheme = ['primary' => '#16A34A', 'secondary' => '#FFFFFF'];
     $tenantTheme = [
@@ -24,28 +29,18 @@
 >
     @php
         $notifications = collect();
-        $isTenantAdminUser = $authUser
-            && $currentTenant
-            && strcasecmp((string) $authUser->email, (string) ($currentTenant->tenant_admin_email ?? '')) === 0;
 
-        if ($isTenantAdminUser && ! $authUser->hasRole('Platform Administrator') && class_exists(\App\Models\Patch::class)) {
-            $appliedPatchIds = collect($currentTenant->patches_applied ?? [])->map(fn ($id) => (int) $id)->all();
-
-            $notifications = \App\Models\Patch::query()
-                ->whereNotIn('id', $appliedPatchIds)
-                ->latest()
-                ->take(5)
-                ->get()
-                ->map(fn ($patch) => [
-                    'id' => $patch->id,
-                    'key' => 'patch-' . $patch->id,
-                    'type' => 'patch-available',
-                    'title' => 'New patch available',
-                    'message' => $patch->title . ' is ready for your workspace. Review it in Update Center and choose when to apply it.',
-                    'created_at' => $patch->created_at,
-                    'url' => route('update-center'),
-                    'action_label' => 'Open Update Center',
-                ]);
+        if ($hasPendingRelease && ! $authUser->hasRole('Platform Administrator')) {
+            $notifications = collect([[
+                'id' => $latestRelease['tag_name'],
+                'key' => 'release-' . $latestRelease['tag_name'],
+                'type' => 'release-available',
+                'title' => 'Release available ' . $latestRelease['tag_name'],
+                'message' => $latestRelease['name'] . ' is ready to review and apply.',
+                'created_at' => $latestRelease['published_at'],
+                'url' => route('update-center'),
+                'action_label' => 'Open Update Center',
+            ]]);
         }
     @endphp
 
@@ -154,7 +149,7 @@
         <!-- Main Content with Sidebar -->
         <div class="flex flex-1 min-h-0 overflow-hidden bg-white transition-colors duration-300">
             <!-- Sidebar Navigation -->
-            <aside class="w-64 h-full overflow-y-auto bg-white border-r shadow-sm flex-shrink-0">
+            <aside class="w-64 h-full overflow-y-auto bg-white border-r shadow-sm flex flex-col flex-shrink-0">
                 <div class="px-6 py-4 border-b min-h-[116px] flex flex-col justify-center">
                     <div class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Workspace</div>
                     <div class="flex items-center gap-2 mt-2">
@@ -167,7 +162,7 @@
                         @endif
                     </div>
                 </div>
-                <nav class="p-2">
+                <nav class="flex-1 p-2">
                         <a href="{{ auth()->user()->hasRole('Platform Administrator') ? route('admin.dashboard') : route('dashboard') }}" class="flex items-center px-4 py-3 {{ request()->routeIs('dashboard') || request()->routeIs('admin.dashboard') ? 'bg-nsync-green-50 border-r-2 border-nsync-green-600 text-nsync-green-700' : 'text-gray-700 hover:bg-gray-50' }} font-medium rounded-r-lg transition group">
                             <svg class="w-5 h-5 mr-3 opacity-75 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
@@ -211,10 +206,25 @@
                         Settings
                     </a>
                 </nav>
+                <div class="border-t border-gray-100 px-6 py-4">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">NSync Version</div>
+                    <a href="{{ route('update-center') }}" class="mt-1 inline-flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-nsync-green-700">
+                        <span>{{ $appliedVersion }}</span>
+                        @if($hasPendingRelease)
+                            <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Update</span>
+                        @endif
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
             </aside>
             
             <!-- Page Content -->
-            <main class="flex-1 min-h-0 overflow-y-auto px-8 pb-8 pt-0 bg-white transition-colors duration-300">
+            <main
+                class="flex-1 min-h-0 overflow-y-auto px-8 pb-8 pt-0 bg-white transition-colors duration-300"
+                @scroll="$dispatch('nsync-main-content-scrolled')"
+            >
                 {{ $slot }}
             </main>
         </div>

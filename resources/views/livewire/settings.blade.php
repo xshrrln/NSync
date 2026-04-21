@@ -2,6 +2,7 @@
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
 use App\Models\AppSetting;
+use App\Support\GitHubReleaseService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -28,6 +29,20 @@ new class extends Component {
     public int $twoFactorCodeTtlMinutes = 10;
     public $primaryOptions = ['#16A34A', '#34D399', '#60A5FA', '#FBBF24', '#F472B6', '#F87171', '#9CA3AF'];
     public $secondaryOptions = ['#FFFFFF', '#F8FAFC', '#ECFEFF', '#FFF7ED', '#FEF2F2', '#F3F4F6'];
+
+    public function with(): array
+    {
+        $releaseService = app(GitHubReleaseService::class);
+        $releases = collect($releaseService->releases(5));
+        $tenant = app()->bound('currentTenant') ? app('currentTenant') : null;
+
+        return [
+            'latestRelease' => $releases->first(),
+            'latestVersion' => $releaseService->latestVersion(),
+            'appliedVersion' => (string) ($tenant?->applied_release_version ?: $releaseService->latestVersion()),
+            'releases' => $releases,
+        ];
+    }
 
     private function ensureSubscriptionAccess(string $title = 'Subscription Required'): bool
     {
@@ -251,6 +266,38 @@ new class extends Component {
 
     <!-- Main Content -->
         <div class="mx-auto max-w-7xl px-6 py-8 space-y-8">
+            <!-- Updates Section -->
+            <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-8">
+                <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900">Updates</h2>
+                        <p class="text-gray-600 text-base mt-2">Applied NSync release: <span class="font-bold text-gray-900">{{ $appliedVersion }}</span></p>
+                    </div>
+                    <a href="{{ route('update-center') }}" class="inline-flex rounded-lg bg-nsync-green-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-nsync-green-700">
+                        Open Update Center
+                    </a>
+                </div>
+
+                <div class="space-y-3">
+                    @forelse($releases as $release)
+                        <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-sm font-bold text-gray-900">{{ $release['tag_name'] }}</span>
+                                <span class="text-sm font-semibold text-gray-700">{{ $release['name'] }}</span>
+                                @if($release['published_on'])
+                                    <span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-gray-500">{{ $release['published_on'] }}</span>
+                                @endif
+                            </div>
+                            <p class="mt-2 line-clamp-2 text-sm leading-6 text-gray-600">{{ $release['body'] ?: 'Maintenance and reliability updates included in this release.' }}</p>
+                        </div>
+                    @empty
+                        <div class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
+                            No product releases have been published yet.
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
             <!-- Profile Section -->
             <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-8">
                 <div class="mb-6">

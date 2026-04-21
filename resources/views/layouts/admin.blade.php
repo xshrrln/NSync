@@ -73,11 +73,6 @@
                 Support
             </a>
 
-            <a href="{{ route('admin.patches') }}" class="flex items-center gap-3 p-3 rounded-xl font-bold transition-all {{ request()->routeIs('admin.patches') ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900' }}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                Patches
-            </a>
-
             <a href="{{ route('admin.archive') }}" class="flex items-center gap-3 p-3 rounded-xl font-bold transition-all {{ request()->routeIs('admin.archive') ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900' }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M4 7h16M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>
                 Archive
@@ -125,10 +120,6 @@
                 $roleLabel = $adminUser?->getRoleNames()->first() ?? 'Platform Administrator';
             @endphp
             <div class="flex items-center gap-3">
-                <a href="{{ route('admin.patches') }}"
-                   class="hidden rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-green-700 md:inline-flex">
-                    Create Patch
-                </a>
                 <a href="{{ route('admin.support.index') }}"
                    class="hidden rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 md:inline-flex">
                     Open Support

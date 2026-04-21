@@ -61,6 +61,8 @@
         })"
     x-init="init(); open = false"
     @keydown.escape.window="open = false"
+    @click.outside="open = false"
+    @nsync-main-content-scrolled.window="open = false"
 >
     <button
         type="button"
@@ -84,7 +86,6 @@
     <div
         x-show="open"
         x-cloak
-        @click.outside="open = false"
         @click.stop
         x-transition.origin.top.right
         class="absolute right-0 top-full mt-2 z-50 p-0 shadow-2xl border border-gray-200 overflow-hidden bg-white"
@@ -124,10 +125,10 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                     </svg>
                                 </div>
-                            @elseif($type === 'patch-available')
-                                <div class="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 4h.01M5.07 19H18.93c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/>
+                            @elseif($type === 'release-available')
+                                <div class="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/>
                                     </svg>
                                 </div>
                             @else

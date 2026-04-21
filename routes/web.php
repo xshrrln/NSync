@@ -86,7 +86,6 @@ Route::domain('nsync.localhost')->middleware(['auth', 'verified', 'platform_admi
     Route::view('/plans-manager', 'admin.plans-manager')->name('plans.manager');
     Route::view('/billing', 'admin.billing')->name('billing');
     Route::view('/support', 'admin.support')->name('support.index');
-    Route::view('/patches', 'admin.patches')->name('patches');
     Route::view('/archive', 'admin.archive')->name('archive');
     Route::get('/settings', [AdminSettingsController::class, 'edit'])->name('settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('settings.update');
