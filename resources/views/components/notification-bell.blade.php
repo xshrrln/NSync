@@ -80,6 +80,7 @@
             class="absolute -top-1 -right-1 block h-5 w-5 rounded-full ring-2 ring-white bg-red-500 text-xs text-white flex items-center justify-center font-bold"
         >
             <span x-text="unreadCount">{{ $notificationCount }}</span>
+        </span>
     </button>
 
     <div
@@ -175,6 +176,7 @@
                             </svg>
                         </button>
                     </div>
+                </div>
             @empty
                 <div class="p-8 text-center text-gray-500">
                     <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -184,4 +186,5 @@
                 </div>
             @endforelse
         </div>
+    </div>
 </div>

@@ -163,7 +163,7 @@
                 $roleLabel = $adminUser?->getRoleNames()->first() ?? 'Platform Administrator';
             @endphp
             <div class="flex items-center gap-3">
-                <x-notification-bell :notifications="$adminNotifications" />
+
 
                 <a href="{{ route('admin.support.index') }}"
                    class="hidden rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 md:inline-flex">
@@ -179,6 +179,8 @@
                         <p class="text-sm font-bold text-gray-400 uppercase tracking-wider mt-1">{{ $roleLabel }}</p>
                     </div>
                 </div>
+
+                <x-notification-bell :notifications="$adminNotifications" />
             </div>
         </header>
 

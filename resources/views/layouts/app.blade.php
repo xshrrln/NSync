@@ -107,7 +107,7 @@
                         <!-- Notification Bell -->
                         <x-notification-bell :notifications="$notifications" />
                         
-                        <!-- User Profile -->
+
                         <x-dropdown align="right">
                             <x-slot name="trigger">
                                 <button class="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 rounded-xl transition font-medium text-sm">
