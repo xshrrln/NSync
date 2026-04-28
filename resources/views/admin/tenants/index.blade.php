@@ -34,7 +34,7 @@
                         <th class="px-8 py-5">Tenant Admin</th>
                         <th class="px-8 py-5 text-center">Plan</th>
                         <th class="px-8 py-5 text-center">Members</th>
-                        <th class="px-8 py-5 text-center">Storage</th>
+                        <th class="px-8 py-5 text-center">Workspace Size</th>
                         <th class="px-8 py-5 text-center">Dates</th>
                         <th class="px-8 py-5 text-center">Status</th>
                         <th class="px-8 py-5 text-right">Actions</th>
@@ -71,7 +71,7 @@
                             </span>
                         </td>
                         <td class="px-8 py-5 text-center font-bold text-gray-700">{{ $tenant->member_count }}</td>
-                        <td class="px-8 py-5 text-center text-gray-500 font-medium">{{ number_format($tenant->storage_used, 1) }}MB</td>
+                        <td class="px-8 py-5 text-center text-gray-500 font-medium">{{ number_format($tenant->storage_used_kb, 1) }} KB</td>
                         <td class="px-8 py-5 text-center text-[11px] text-gray-500">
                             {{ $tenant->start_date ? \Carbon\Carbon::parse($tenant->start_date)->format('M d, Y') : '-' }}
                         </td>

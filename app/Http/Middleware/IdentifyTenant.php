@@ -14,25 +14,75 @@ class IdentifyTenant
 {
     public function handle(Request $request, Closure $next): Response
     {
+        $host = strtolower($request->getHost());
+        $isCentralHost = $this->isCentralHost($host);
+        $isAuthRoute = $request->is('login*', 'register*', 'password*', 'forgot-password', 'auth/*', 'google*', 'admin*');
+
         // Keep central DB for auth/public/admin routes.
-        if ($request->is('login*', 'register*', 'password*', 'forgot-password', 'auth/*', 'google*', 'admin*')) {
+        if ($isAuthRoute) {
+            if (! $isCentralHost) {
+                $tenant = $this->resolveTenantByHost($host);
+
+                if ($tenant) {
+                    // Auth routes should keep the central DB connection, but still expose
+                    // tenant theme data so guest pages render with workspace branding.
+                    app()->instance('currentTenant', $tenant);
+                    return $next($request);
+                }
+            }
+
             app()->instance('currentTenant', null);
             return $next($request);
         }
 
-        $host = strtolower($request->getHost());
-        $isCentralHost = $this->isCentralHost($host);
         $tenant = null;
 
         if ($isCentralHost) {
-            // Central hosts can resolve tenant from authenticated user for direct dashboard use.
-            if (auth()->check() && auth()->user()->tenant) {
+            if (auth()->check() && auth()->user()->tenant && ! $isAuthRoute) {
                 $tenant = auth()->user()->tenant;
+                $tenantHost = strtolower($tenant->domain);
+                $uri = $request->getRequestUri();
+                $scheme = $request->getScheme();
+                $port = parse_url(config('app.url'), PHP_URL_PORT) ?: $request->getPort() ?: 8000;
+                $portSegment = $port && $port !== 80 && $port !== 443 ? ':' . $port : '';
+
+                return redirect()->to("{$scheme}://{$tenantHost}{$portSegment}{$uri}");
             }
         } else {
             // Tenant host: resolve strictly by host only (no user-tenant fallback).
-            $tenant = Tenant::where('domain', $host)->first()
-                ?? Tenant::where('domain', str_replace('www.', '', $host))->first();
+            $tenant = $this->resolveTenantByHost($host);
+
+            if (auth()->check()) {
+                if ($this->cameFromCentralLogin($request)) {
+                    auth()->guard('web')->logout();
+                    $request->session()->invalidate();
+                    $request->session()->regenerateToken();
+
+                    app()->instance('currentTenant', $tenant);
+
+                    $loginUrl = $tenant
+                        ? "http://{$host}" . $this->portSegment($request) . route('login', absolute: false)
+                        : route('login', absolute: false);
+
+                    return redirect()->to($loginUrl)->with('error', 'Please sign in to access this workspace.');
+                }
+
+                $userTenant = auth()->user()->tenant;
+
+                if (! $tenant || ! $userTenant || $userTenant->id !== $tenant->id) {
+                    auth()->guard('web')->logout();
+                    $request->session()->invalidate();
+                    $request->session()->regenerateToken();
+
+                    app()->instance('currentTenant', $tenant);
+
+                    $loginUrl = $tenant
+                        ? "http://{$host}" . $this->portSegment($request) . route('login', absolute: false)
+                        : route('login', absolute: false);
+
+                    return redirect()->to($loginUrl)->with('error', 'Please sign in to access this workspace.');
+                }
+            }
         }
 
         Log::info('Tenant identification attempt', [
@@ -85,5 +135,31 @@ class IdentifyTenant
     private function isCentralHost(string $host): bool
     {
         return in_array($host, ['127.0.0.1', 'localhost', 'nsync.localhost'], true);
+    }
+
+    private function resolveTenantByHost(string $host): ?Tenant
+    {
+        return Tenant::where('domain', $host)->first()
+            ?? Tenant::where('domain', str_replace('www.', '', $host))->first();
+    }
+
+    private function portSegment(Request $request): string
+    {
+        $port = parse_url(config('app.url'), PHP_URL_PORT) ?: $request->getPort() ?: 8000;
+
+        return $port && $port !== 80 && $port !== 443 ? ':' . $port : '';
+    }
+
+    private function cameFromCentralLogin(Request $request): bool
+    {
+        $referer = (string) $request->headers->get('referer', '');
+        if ($referer === '') {
+            return false;
+        }
+
+        $refererHost = strtolower((string) parse_url($referer, PHP_URL_HOST));
+        $refererPath = (string) parse_url($referer, PHP_URL_PATH);
+
+        return $refererHost === 'nsync.localhost' && str_starts_with($refererPath, '/login');
     }
 }

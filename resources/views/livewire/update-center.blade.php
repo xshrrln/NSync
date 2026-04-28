@@ -13,7 +13,7 @@ new class extends Component {
         $releaseService = app(GitHubReleaseService::class);
         $releases = collect($releaseService->releases(12));
         $tenant = app('currentTenant');
-        $appliedVersion = (string) ($tenant?->applied_release_version ?: $releaseService->latestVersion());
+        $appliedVersion = $tenant?->applied_release_version;
         $latestRelease = $releases->first();
         $appliedIndex = $releases->search(fn ($release) => $release['tag_name'] === $appliedVersion);
 
@@ -22,6 +22,7 @@ new class extends Component {
             'latestRelease' => $latestRelease,
             'latestVersion' => $releaseService->latestVersion(),
             'appliedVersion' => $appliedVersion,
+            'appliedVersionDisplay' => $appliedVersion ?: 'Not applied',
             'canApplyReleases' => $this->canApplyReleases($tenant),
             'pendingReleaseCount' => $appliedIndex === false ? $releases->count() : $appliedIndex,
             'releases' => $releases,
@@ -122,7 +123,7 @@ new class extends Component {
             <div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div class="rounded-2xl bg-white px-4 py-3" style="border: 1px solid color-mix(in srgb, var(--tenant-primary) 12%, white 88%);">
                     <p class="text-xs uppercase tracking-wide text-slate-600">Applied Version</p>
-                    <p class="mt-1 text-2xl font-black text-slate-900">{{ $appliedVersion }}</p>
+                    <p class="mt-1 text-2xl font-black text-slate-900">{{ $appliedVersionDisplay }}</p>
                 </div>
                 <div class="rounded-2xl bg-white px-4 py-3" style="border: 1px solid color-mix(in srgb, var(--tenant-primary) 12%, white 88%);">
                     <p class="text-xs uppercase tracking-wide text-slate-600">Latest Available</p>

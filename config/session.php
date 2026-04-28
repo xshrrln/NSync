@@ -2,6 +2,18 @@
 
 use Illuminate\Support\Str;
 
+$sessionDomain = env('SESSION_DOMAIN');
+
+// Browsers treat localhost as a special host and commonly reject cookies with
+// `Domain=.localhost`. Keep local development cookies host-only instead.
+if (is_string($sessionDomain)) {
+    $normalizedSessionDomain = ltrim(Str::lower(trim($sessionDomain)), '.');
+
+    if (in_array($normalizedSessionDomain, ['localhost', '127.0.0.1'], true)) {
+        $sessionDomain = null;
+    }
+}
+
 return [
 
     /*
@@ -156,7 +168,7 @@ return [
     |
     */
 
-    'domain' => env('SESSION_DOMAIN'),
+    'domain' => $sessionDomain,
 
     /*
     |--------------------------------------------------------------------------

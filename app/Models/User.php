@@ -28,6 +28,7 @@ class User extends Authenticatable
         'tenant_id',
         'avatar',
         'google_id',
+        'status',
     ];
 
 

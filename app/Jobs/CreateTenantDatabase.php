@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Tenant;
+use App\Support\GitHubReleaseService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Artisan;
@@ -36,6 +37,9 @@ class CreateTenantDatabase implements ShouldQueue, NotTenantAware
     public function handle(): void
     {
         try {
+            $latestVersion = app(GitHubReleaseService::class)->latestVersion();
+            $appliedAt = now();
+
             // Build database name if missing
             $databaseName = $this->tenant->database
                 ?: Tenant::generateDatabaseName($this->tenant->name, $this->tenant->id);
@@ -91,6 +95,9 @@ class CreateTenantDatabase implements ShouldQueue, NotTenantAware
                 if ($hasTenantId) {
                     $seed['tenant_id'] = $this->tenant->id;
                 }
+                if (Schema::connection('tenant')->hasColumn('users', 'status')) {
+                    $seed['status'] = 'active';
+                }
                 DB::connection('tenant')->table('users')->updateOrInsert(
                     ['email' => $this->seedUser['email']],
                     $seed
@@ -100,6 +107,39 @@ class CreateTenantDatabase implements ShouldQueue, NotTenantAware
             // Seed if needed (optional)
             // $process = new Process(['php', 'artisan', 'db:seed', '--class=TenantSeeder']);
             // $process->run();
+
+            $this->tenant->forceFill([
+                'applied_release_version' => $latestVersion,
+                'applied_release_at' => $appliedAt,
+            ])->save();
+
+            if (Schema::connection('tenant')->hasTable('tenants')
+                && Schema::connection('tenant')->hasColumn('tenants', 'applied_release_version')
+                && Schema::connection('tenant')->hasColumn('tenants', 'applied_release_at')) {
+                DB::connection('tenant')->table('tenants')->updateOrInsert(
+                    ['id' => $this->tenant->id],
+                    [
+                        'organization' => $this->tenant->organization,
+                        'name' => $this->tenant->name,
+                        'address' => $this->tenant->address,
+                        'tenant_admin' => $this->tenant->tenant_admin,
+                        'tenant_admin_email' => $this->tenant->tenant_admin_email,
+                        'domain' => $this->tenant->domain,
+                        'database' => $this->tenant->database,
+                        'plan' => $this->tenant->plan,
+                        'status' => $this->tenant->status,
+                        'theme' => is_array($this->tenant->theme) ? json_encode($this->tenant->theme) : $this->tenant->getRawOriginal('theme'),
+                        'actions' => is_array($this->tenant->actions) ? json_encode($this->tenant->actions) : $this->tenant->getRawOriginal('actions'),
+                        'billing_data' => is_array($this->tenant->billing_data) ? json_encode($this->tenant->billing_data) : $this->tenant->getRawOriginal('billing_data'),
+                        'start_date' => $this->tenant->start_date,
+                        'due_date' => $this->tenant->due_date,
+                        'applied_release_version' => $latestVersion,
+                        'applied_release_at' => $appliedAt,
+                        'created_at' => $this->tenant->created_at ?? $appliedAt,
+                        'updated_at' => $appliedAt,
+                    ]
+                );
+            }
 
             \Log::info("Database created for tenant: {$databaseName}");
         } catch (\Exception $e) {

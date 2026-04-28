@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\LenientEncrypted;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +18,7 @@ class Stage extends Model
     protected $fillable = ['tenant_id', 'board_id', 'name', 'position'];
 
     protected $casts = [
-        'name' => 'encrypted',
+        'name' => LenientEncrypted::class,
     ];
 
     protected static function booted()

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Casts\LenientEncrypted;
+use App\Casts\LenientEncryptedArray;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Schema;
@@ -16,9 +18,9 @@ class Board extends Model
     protected $fillable = ['tenant_id', 'name', 'slug', 'starred_by', 'members'];
 
     protected $casts = [
-        'name' => 'encrypted',
+        'name' => LenientEncrypted::class,
         'starred_by' => 'array',
-        'members' => 'encrypted:array',
+        'members' => LenientEncryptedArray::class,
     ];
 
     protected static function booted()

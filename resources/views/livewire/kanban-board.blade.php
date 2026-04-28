@@ -152,25 +152,26 @@ new class extends Component {
 
         $activityLogs = collect();
         if (! $this->isCapstoneTracker && ($featureFlags['activity_logs'] || $featureFlags['audit_export'])) {
-            $activityLogs = DB::connection('tenant')
-                ->table('activity_logs as al')
-                ->leftJoin('tasks as t', 't.id', '=', 'al.task_id')
-                ->leftJoin('stages as os', 'os.id', '=', 'al.old_stage_id')
-                ->leftJoin('stages as ns', 'ns.id', '=', 'al.new_stage_id')
-                ->leftJoin('users as u', 'u.id', '=', 'al.user_id')
-                ->select([
-                    'al.id',
-                    'al.created_at',
-                    'al.ip_address',
-                    't.title as task_title',
-                    'os.name as old_stage_name',
-                    'ns.name as new_stage_name',
-                    'u.name as actor_name',
+            $activityLogs = ActivityLog::query()
+                ->with([
+                    'user:id,name',
+                    'task:id,title,board_id',
+                    'oldStage:id,name',
+                    'newStage:id,name',
                 ])
-                ->where('t.board_id', $this->boardId)
-                ->orderByDesc('al.id')
+                ->whereHas('task', fn ($query) => $query->where('board_id', $this->boardId))
+                ->orderByDesc('id')
                 ->limit(25)
-                ->get();
+                ->get()
+                ->map(function (ActivityLog $log) {
+                    $log->actor_name = (string) ($log->user?->name ?? '');
+                    $log->task_title = (string) ($log->task_title_snapshot ?: ($log->task?->title ?? ''));
+                    $log->old_stage_name = (string) ($log->old_stage_name_snapshot ?: ($log->oldStage?->name ?? ''));
+                    $log->new_stage_name = (string) ($log->new_stage_name_snapshot ?: ($log->newStage?->name ?? ''));
+
+                    return $log;
+                })
+                ->values();
         }
 
         $boardMessages = collect();
@@ -386,6 +387,9 @@ new class extends Component {
                 'old_stage_id' => $oldStageId,
                 'new_stage_id' => $normalizedStageId,
                 'ip_address' => request()->ip(),
+                'task_title_snapshot' => (string) ($task->title ?? ''),
+                'old_stage_name_snapshot' => (string) (optional(Stage::find($oldStageId))->name ?? ''),
+                'new_stage_name_snapshot' => (string) ($destinationStage->name ?? ''),
             ]);
         }
     }
@@ -586,34 +590,32 @@ new class extends Component {
             abort(403, 'Audit export is not available on your current plan.');
         }
 
-        $rows = DB::connection('tenant')
-            ->table('activity_logs as al')
-            ->leftJoin('tasks as t', 't.id', '=', 'al.task_id')
-            ->leftJoin('stages as os', 'os.id', '=', 'al.old_stage_id')
-            ->leftJoin('stages as ns', 'ns.id', '=', 'al.new_stage_id')
-            ->leftJoin('users as u', 'u.id', '=', 'al.user_id')
-            ->select([
-                'al.id',
-                'al.created_at',
-                'u.name as actor_name',
-                't.title as task_title',
-                'os.name as old_stage_name',
-                'ns.name as new_stage_name',
-                'al.ip_address',
+        $rows = ActivityLog::query()
+            ->with([
+                'user:id,name',
+                'task:id,title,board_id',
+                'oldStage:id,name',
+                'newStage:id,name',
             ])
-            ->where('t.board_id', $this->boardId)
-            ->orderByDesc('al.id')
+            ->whereHas('task', fn ($query) => $query->where('board_id', $this->boardId))
+            ->orderByDesc('id')
             ->get();
 
         $preparedRows = $rows
             ->map(function ($row) {
+                $taskTitle = (string) ($row->task_title_snapshot ?: ($row->task?->title ?? ''));
+                $oldStageName = (string) ($row->old_stage_name_snapshot ?: ($row->oldStage?->name ?? ''));
+                $newStageName = (string) ($row->new_stage_name_snapshot ?: ($row->newStage?->name ?? ''));
+                $actionSummary = trim("Moved from {$oldStageName} to {$newStageName}");
+
                 return (object) [
                     'id' => (int) ($row->id ?? 0),
                     'created_at' => $this->formatAuditTimestamp($row->created_at ?? null),
-                    'actor_name' => $this->readableAuditValue((string) ($row->actor_name ?? ''), 'Unknown user', 70),
-                    'task_title' => $this->readableAuditValue((string) ($row->task_title ?? ''), 'Unknown task', 120),
-                    'old_stage_name' => $this->readableAuditValue((string) ($row->old_stage_name ?? ''), 'Previous stage', 40),
-                    'new_stage_name' => $this->readableAuditValue((string) ($row->new_stage_name ?? ''), 'New stage', 40),
+                    'actor_name' => $this->readableAuditValue((string) ($row->user?->name ?? ''), 'Unknown user', 70),
+                    'task_title' => $this->readableAuditValue($taskTitle, 'Unknown task', 120),
+                    'action_summary' => $this->readableAuditValue($actionSummary ?: 'Task update', 'Task update', 100),
+                    'old_stage_name' => $this->readableAuditValue($oldStageName, 'Previous stage', 40),
+                    'new_stage_name' => $this->readableAuditValue($newStageName, 'New stage', 40),
                     'ip_address' => $this->readableAuditValue((string) ($row->ip_address ?? ''), '-', 45),
                 ];
             })
@@ -818,6 +820,9 @@ new class extends Component {
         if (Schema::connection('tenant')->hasColumn('users', 'role')) {
             $payload['role'] = $authUser->hasRole('Team Supervisor') ? 'supervisor' : 'member';
         }
+        if (Schema::connection('tenant')->hasColumn('users', 'status')) {
+            $payload['status'] = 'active';
+        }
 
         try {
             $insertedId = $users->insertGetId($payload);
@@ -857,7 +862,7 @@ new class extends Component {
             </div>
             <div class="hidden md:flex items-center gap-2">
                 @if($featureFlags['member_invites'])
-                    <a href="{{ route('team.invite') }}" class="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700">Invite Member</a>
+                    <a href="{{ route('team.invite') }}" class="px-3 py-2 text-white rounded-lg text-xs font-semibold" style="background-color: var(--tenant-primary);">Invite Member</a>
                 @endif
                 @if($featureFlags['guest_boards'] && auth()->user()?->hasRole('Team Supervisor'))
                     <button wire:click="generateGuestBoardLink" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700">
@@ -869,7 +874,7 @@ new class extends Component {
                         Export Audit PDF
                     </button>
                 @endif
-                <a href="{{ route('billing') }}" class="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700">Billing</a>
+                <a href="{{ route('billing') }}" class="px-3 py-2 text-white rounded-lg text-xs font-semibold" style="background-color: var(--tenant-primary);">Billing</a>
             </div>
         </div>
     </div>
@@ -887,7 +892,7 @@ new class extends Component {
 
     @if($isCapstoneTracker)
         <div class="max-w-7xl mx-auto px-6 py-6 space-y-6" x-data="capstoneTaskTracker(@entangle('capstoneTasks').live)" x-init="init()">
-            <div class="bg-gradient-to-r from-emerald-50 to-sky-50 border border-emerald-100 rounded-2xl p-4 mb-5">
+            <div class="rounded-2xl p-4 mb-5" style="background-color: color-mix(in srgb, var(--tenant-secondary) 75%, white 25%); border: 1px solid color-mix(in srgb, var(--tenant-primary) 20%, white 80%);">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
                         <h2 class="text-lg font-bold text-gray-900">Capstone Task Tracker</h2>
@@ -899,7 +904,7 @@ new class extends Component {
                     </div>
                 </div>
                 <div class="mt-3 h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                    <div class="h-full bg-emerald-500 transition-all" :style="`width: ${Math.min(100, Math.max(0, getOverallProgress()))}%`"></div>
+                    <div class="h-full transition-all" style="background-color: var(--tenant-primary);" :style="`width: ${Math.min(100, Math.max(0, getOverallProgress()))}%`"></div>
                 </div>
             </div>
 
@@ -922,20 +927,20 @@ new class extends Component {
                             <tr class="border-t border-gray-100" :class="isOverdue(task) ? 'bg-red-50/70' : ''">
                                 <td class="px-3 py-2 font-semibold text-gray-700" x-text="index + 1"></td>
                                 <td class="px-3 py-2">
-                                    <input type="text" x-model="task.title" @input="persist()" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="Define task" />
+                                    <input type="text" x-model="task.title" @input="persist()" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:border-transparent" style="--tw-ring-color: var(--tenant-primary);" placeholder="Define task" />
                                 </td>
                                 <td class="px-3 py-2">
-                                    <input type="text" x-model="task.owner" @input="persist()" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="Assign owner" />
+                                    <input type="text" x-model="task.owner" @input="persist()" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:border-transparent" style="--tw-ring-color: var(--tenant-primary);" placeholder="Assign owner" />
                                 </td>
                                 <td class="px-3 py-2">
-                                    <input type="date" x-model="task.start_date" @change="persist()" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                                    <input type="date" x-model="task.start_date" @change="persist()" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:border-transparent" style="--tw-ring-color: var(--tenant-primary);" />
                                 </td>
                                 <td class="px-3 py-2">
-                                    <input type="date" x-model="task.due_date" @change="persist()" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                                    <input type="date" x-model="task.due_date" @change="persist()" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:border-transparent" style="--tw-ring-color: var(--tenant-primary);" />
                                 </td>
                                 <td class="px-3 py-2 font-medium text-gray-700" x-text="formatDuration(task)"></td>
                                 <td class="px-3 py-2">
-                                    <input type="number" min="0" max="100" x-model.number="task.progress" @input="task.progress = clampProgress(task.progress); persist()" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                                    <input type="number" min="0" max="100" x-model.number="task.progress" @input="task.progress = clampProgress(task.progress); persist()" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:border-transparent" style="--tw-ring-color: var(--tenant-primary);" />
                                 </td>
                                 <td class="px-3 py-2">
                                     <div class="flex items-center gap-2">
@@ -951,7 +956,7 @@ new class extends Component {
             </div>
 
             <div class="mt-4 flex items-center gap-3">
-                <button @click="insertBelow(tasks.length - 1)" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700">Add Row</button>
+                <button @click="insertBelow(tasks.length - 1)" class="px-4 py-2 text-white rounded-lg text-sm font-semibold" style="background-color: var(--tenant-primary);">Add Row</button>
                 <p class="text-xs text-gray-500">Computed fields (Task ID, Duration, Overall Progress) update automatically and are not editable.</p>
             </div>
 
@@ -1607,6 +1612,3 @@ new class extends Component {
         }
     }
 </style>
-
-
-

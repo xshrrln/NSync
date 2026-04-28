@@ -5,6 +5,7 @@
     $selectedPlanName = $selectedPlan['name'] ?? ucfirst((string) $selectedPlanKey);
     $selectedPlanPrice = $selectedPlan['price'] ?? '';
     $selectedPlanMembers = $selectedPlan['members_limit'] ?? null;
+    $changePlanBaseUrl = route('landing', absolute: false) . '#pricing';
 @endphp
 
 <x-guest-layout>
@@ -13,7 +14,7 @@
         <p class="text-base text-gray-600 mt-2">Register your team workspace and choose your plan.</p>
     </div>
 
-    <form method="POST" action="{{ route('register.store') }}" class="space-y-6">
+    <form method="POST" action="{{ route('register.store', absolute: false) }}" class="space-y-6" data-register-form>
         @csrf
         <input type="hidden" name="plan" value="{{ $selectedPlanKey }}">
 
@@ -112,7 +113,7 @@
                     <p class="text-sm font-semibold text-gray-700">Selected Plan</p>
                     <h3 class="text-xl font-bold text-gray-900 mt-1">{{ $selectedPlanName }}</h3>
                 </div>
-                <a href="{{ route('landing') }}#pricing" class="text-sm font-semibold text-green-700 hover:underline">
+                <a href="{{ $changePlanBaseUrl }}" class="text-sm font-semibold text-green-700 hover:underline" data-change-plan-link>
                     Change plan
                 </a>
             </div>
@@ -130,7 +131,7 @@
         </div>
 
         <div class="flex items-center justify-between pt-2">
-            <a class="text-sm text-gray-600 hover:text-gray-900 underline underline-offset-4" href="{{ route('login') }}">
+            <a class="text-sm text-gray-600 hover:text-gray-900 underline underline-offset-4" href="{{ route('login', absolute: false) }}">
                 Already registered?
             </a>
 
@@ -144,4 +145,38 @@
             </button>
         </div>
     </form>
+
+    <script>
+        (() => {
+            const form = document.querySelector('[data-register-form]');
+            const link = document.querySelector('[data-change-plan-link]');
+
+            if (!form || !link) {
+                return;
+            }
+
+            const baseUrl = @json($changePlanBaseUrl);
+            const persistedFields = ['org_name', 'org_address', 'org_domain', 'name', 'email'];
+
+            const updateChangePlanLink = () => {
+                const params = new URLSearchParams();
+
+                persistedFields.forEach((field) => {
+                    const input = form.querySelector(`[name="${field}"]`);
+                    const value = input?.value?.trim() ?? '';
+
+                    if (value !== '') {
+                        params.set(field, value);
+                    }
+                });
+
+                const query = params.toString();
+                link.href = query === '' ? baseUrl : `${baseUrl.split('#')[0]}?${query}#pricing`;
+            };
+
+            form.addEventListener('input', updateChangePlanLink);
+            form.addEventListener('change', updateChangePlanLink);
+            updateChangePlanLink();
+        })();
+    </script>
 </x-guest-layout>

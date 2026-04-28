@@ -5,6 +5,7 @@ namespace App\Models;
 use Spatie\Multitenancy\Models\Tenant as BaseTenant;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use App\Models\Board;
@@ -12,16 +13,43 @@ use App\Models\User;
 
 class Tenant extends BaseTenant
 {
+    private const CONTENT_STORAGE_TABLES = [
+        'activity_log',
+        'activity_logs',
+        'boards',
+        'messages',
+        'pending_invites',
+        'stages',
+        'support_ticket_messages',
+        'support_tickets',
+        'tasks',
+        'users',
+    ];
+
+    private const USAGE_STORAGE_BASE_BYTES = 128 * 1024;
+
+    private const USAGE_STORAGE_WEIGHTS = [
+        'users' => 24 * 1024,
+        'boards' => 40 * 1024,
+        'stages' => 12 * 1024,
+        'tasks' => 16 * 1024,
+        'messages' => 10 * 1024,
+        'pending_invites' => 6 * 1024,
+        'activity_logs' => 2 * 1024,
+        'activity_log' => 1024,
+        'support_tickets' => 12 * 1024,
+        'support_ticket_messages' => 8 * 1024,
+    ];
+
     protected $fillable = [
         'organization', 'name', 'address', 'tenant_admin', 'tenant_admin_email',
-        'domain', 'database', 'plan', 'start_date', 'due_date', 
-        'status', 'theme', 'actions', 'billing_data', 'patches_applied'
+        'domain', 'database', 'plan', 'start_date', 'due_date',
+        'status', 'theme', 'actions', 'billing_data'
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'due_date' => 'date',
-        'patches_applied' => 'array',
         'actions' => 'array',
         'billing_data' => 'array',
     ];
@@ -104,16 +132,24 @@ class Tenant extends BaseTenant
         return $this->hasMany(User::class);
     }
 
-    public function getStorageUsedAttribute()
+    public function getStorageUsedBytesAttribute(): int
+    {
+        return $this->usage_storage_used_bytes;
+    }
+
+    public function getContentStorageBytesAttribute(): int
     {
         $totalBytes = 0;
 
-        // 1) Database size (boards/tasks/stages + all tenant tables).
+        // 1) Content table size only. Excludes framework, auth, cache, and migration overhead.
         if (!empty($this->database)) {
             try {
                 $row = DB::connection('mysql')->selectOne(
-                    'SELECT COALESCE(SUM(data_length + index_length), 0) AS total FROM information_schema.tables WHERE table_schema = ?',
-                    [$this->database]
+                    'SELECT COALESCE(SUM(data_length + index_length), 0) AS total
+                     FROM information_schema.tables
+                     WHERE table_schema = ?
+                     AND table_name IN (' . implode(',', array_fill(0, count(self::CONTENT_STORAGE_TABLES), '?')) . ')',
+                    array_merge([$this->database], self::CONTENT_STORAGE_TABLES)
                 );
                 $totalBytes += (int) ($row->total ?? 0);
             } catch (\Throwable) {
@@ -132,8 +168,101 @@ class Tenant extends BaseTenant
             }
         }
 
-        // Return MB so existing admin UI keeps working.
-        return $totalBytes / 1024 / 1024;
+        return $totalBytes;
+    }
+
+    public function getUsageStorageUsedBytesAttribute(): int
+    {
+        $totalBytes = self::USAGE_STORAGE_BASE_BYTES;
+
+        foreach (self::USAGE_STORAGE_WEIGHTS as $table => $weight) {
+            $totalBytes += $this->tenantTableRowCount($table) * $weight;
+        }
+
+        $tenantPath = storage_path("app/tenants/{$this->database}");
+        if (is_dir($tenantPath)) {
+            $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($tenantPath));
+            foreach ($files as $file) {
+                if ($file->isFile()) {
+                    $totalBytes += $file->getSize();
+                }
+            }
+        }
+
+        return $totalBytes;
+    }
+
+    public function getTotalStorageUsedBytesAttribute(): int
+    {
+        $totalBytes = 0;
+
+        if (! empty($this->database)) {
+            try {
+                $row = DB::connection('mysql')->selectOne(
+                    'SELECT COALESCE(SUM(data_length + index_length), 0) AS total FROM information_schema.tables WHERE table_schema = ?',
+                    [$this->database]
+                );
+                $totalBytes += (int) ($row->total ?? 0);
+            } catch (\Throwable) {
+                // keep rendering even if metadata query fails
+            }
+        }
+
+        $tenantPath = storage_path("app/tenants/{$this->database}");
+        if (is_dir($tenantPath)) {
+            $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($tenantPath));
+            foreach ($files as $file) {
+                if ($file->isFile()) {
+                    $totalBytes += $file->getSize();
+                }
+            }
+        }
+
+        return $totalBytes;
+    }
+
+    public function getStorageUsedAttribute(): float
+    {
+        return $this->storage_used_bytes / 1024 / 1024;
+    }
+
+    public function getStorageUsedKbAttribute(): float
+    {
+        return $this->storage_used_bytes / 1024;
+    }
+
+    public function getTotalStorageUsedKbAttribute(): float
+    {
+        return $this->total_storage_used_bytes / 1024;
+    }
+
+    private function tenantTableRowCount(string $table): int
+    {
+        if (! $this->database || ! preg_match('/^[A-Za-z0-9_]+$/', $this->database) || ! preg_match('/^[A-Za-z0-9_]+$/', $table)) {
+            return 0;
+        }
+
+        try {
+            $exists = DB::connection('mysql')->selectOne(
+                'SELECT COUNT(*) AS aggregate
+                 FROM information_schema.tables
+                 WHERE table_schema = ?
+                 AND table_name = ?',
+                [$this->database, $table]
+            );
+
+            if ((int) ($exists->aggregate ?? 0) === 0) {
+                return 0;
+            }
+
+            $row = DB::connection('mysql')->selectOne(
+                "SELECT COUNT(*) AS aggregate FROM `{$this->database}`.`{$table}`"
+            );
+
+            return (int) ($row->aggregate ?? 0);
+        } catch (\Throwable) {
+            return 0;
+        }
     }
 
     public function getMemberCountAttribute()

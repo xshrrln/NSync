@@ -506,6 +506,9 @@ new class extends Component {
         if (Schema::connection('tenant')->hasColumn('users', 'role')) {
             $payload['role'] = $authUser->hasRole('Team Supervisor') ? 'supervisor' : 'member';
         }
+        if (Schema::connection('tenant')->hasColumn('users', 'status')) {
+            $payload['status'] = 'active';
+        }
 
         try {
             $insertedId = $users->insertGetId($payload);

@@ -10,6 +10,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -65,6 +66,14 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        if (Schema::hasColumn($user->getTable(), 'status') && $user->status === 'disabled') {
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'This member account has been archived. Contact your team supervisor to restore access.',
+            ]);
+        }
+
         Auth::login($user, $this->boolean('remember'));
         $host = strtolower($this->getHost());
 
@@ -88,7 +97,7 @@ class LoginRequest extends FormRequest
             ]);
         }
 
-        if ($tenant && (! $user->belongsToTenant($tenant) || $user->hasRole('Platform Administrator'))) {
+        if ($tenant && ! $user->belongsToTenant($tenant) && ! $user->hasRole('Platform Administrator')) {
             Auth::logout();
             RateLimiter::hit($this->throttleKey());
             throw ValidationException::withMessages([

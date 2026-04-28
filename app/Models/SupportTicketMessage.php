@@ -17,6 +17,11 @@ class SupportTicketMessage extends Model
         'author_name',
         'author_email',
         'message',
+        'attachments',
+    ];
+
+    protected $casts = [
+        'attachments' => 'array',
     ];
 
     public function ticket(): BelongsTo
@@ -29,4 +34,3 @@ class SupportTicketMessage extends Model
         return $this->belongsTo(Tenant::class);
     }
 }
-

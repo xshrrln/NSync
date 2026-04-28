@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ config('app.name', 'Laravel') }} - @yield('title', 'Workspace')</title>
-    <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'><path fill='%23f55246' d='M52 45 17 73l79 61-44 34 123 95-53-92 77-60Z'/></svg>">
+    <link rel="icon" type="image/png" href="{{ asset('images/favicon-logo.png') }}">
     
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 @livewireStyles</head>
@@ -14,7 +14,8 @@
     $releaseService = app(\App\Support\GitHubReleaseService::class);
     $latestRelease = $releaseService->latest();
     $latestVersion = $releaseService->latestVersion();
-    $appliedVersion = (string) ($currentTenant?->applied_release_version ?: $latestVersion);
+    $appliedVersion = $currentTenant?->applied_release_version;
+    $appliedVersionDisplay = $appliedVersion ?: 'Not applied';
     $hasPendingRelease = $currentTenant && $latestRelease && $latestRelease['tag_name'] !== $appliedVersion;
     $theme = is_array($currentTenant?->theme) ? $currentTenant->theme : [];
     $defaultTheme = ['primary' => '#16A34A', 'secondary' => '#FFFFFF'];
@@ -209,7 +210,7 @@
                 <div class="border-t border-gray-100 px-6 py-4">
                     <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">NSync Version</div>
                     <a href="{{ route('update-center') }}" class="mt-1 inline-flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-nsync-green-700">
-                        <span>{{ $appliedVersion }}</span>
+                        <span>{{ $appliedVersionDisplay }}</span>
                         @if($hasPendingRelease)
                             <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Update</span>
                         @endif
@@ -274,6 +275,119 @@
     @endif
     
     @livewireScripts
+    @if($hasPendingRelease && ! $authUser->hasRole('Platform Administrator'))
+        <script>
+            (() => {
+                const releaseKey = @js('release-' . $latestRelease['tag_name']);
+                const toastSeenKey = @js('nsync.release-toast.seen.' . $latestRelease['tag_name']);
+                const updateUrl = @js(route('update-center'));
+                const title = @js('New release available');
+                const message = @js($latestRelease['name'] . ' is ready to review and apply.');
+
+                try {
+                    if (window.sessionStorage.getItem(toastSeenKey) === '1') {
+                        return;
+                    }
+                } catch (error) {
+                    // Ignore storage errors and continue showing the toast.
+                }
+
+                if (!releaseKey) {
+                    return;
+                }
+
+                const containerId = 'nsync-release-toast-container';
+                let container = document.getElementById(containerId);
+
+                if (!container) {
+                    container = document.createElement('div');
+                    container.id = containerId;
+                    container.className = 'fixed top-4 right-4 z-[9999] w-[min(92vw,22rem)] pointer-events-none';
+                    document.body.appendChild(container);
+                }
+
+                const toast = document.createElement('div');
+                toast.className = 'pointer-events-auto relative overflow-hidden rounded-2xl border border-emerald-100 bg-white/95 shadow-2xl ring-1 ring-black/5 backdrop-blur cursor-pointer';
+                toast.innerHTML = `
+                    <div class="h-1 w-full bg-slate-100/90">
+                        <div data-progress class="h-1 w-full origin-left bg-emerald-500"></div>
+                    </div>
+                    <div class="flex items-start gap-3 px-4 py-3">
+                        <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 11l5-5m0 0l5 5m-5-5v12"/>
+                            </svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">${title}</p>
+                            <p class="mt-1 text-xs font-medium leading-5 text-slate-700">${message}</p>
+                        </div>
+                        <button type="button" data-close class="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label="Dismiss notification">
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+
+                const markToastSeen = () => {
+                    try {
+                        window.sessionStorage.setItem(toastSeenKey, '1');
+                    } catch (error) {
+                        // Ignore storage errors.
+                    }
+                };
+
+                const progress = toast.querySelector('[data-progress]');
+                const closeButton = toast.querySelector('[data-close]');
+                const duration = 4500;
+                const startedAt = performance.now();
+                let removed = false;
+                let animationFrame = null;
+
+                const removeToast = () => {
+                    if (removed) {
+                        return;
+                    }
+
+                    removed = true;
+                    if (animationFrame) {
+                        cancelAnimationFrame(animationFrame);
+                    }
+                    toast.remove();
+                };
+
+                const step = (now) => {
+                    const elapsed = now - startedAt;
+                    const remaining = Math.max(0, 1 - (elapsed / duration));
+                    progress.style.transformOrigin = 'left center';
+                    progress.style.transform = `scaleX(${remaining})`;
+
+                    if (remaining > 0) {
+                        animationFrame = requestAnimationFrame(step);
+                    } else {
+                        removeToast();
+                    }
+                };
+
+                closeButton?.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    markToastSeen();
+                    removeToast();
+                });
+
+                toast.addEventListener('click', () => {
+                    markToastSeen();
+                    window.location.href = updateUrl;
+                });
+
+                container.appendChild(toast);
+                markToastSeen();
+                animationFrame = requestAnimationFrame(step);
+                setTimeout(removeToast, duration);
+            })();
+        </script>
+    @endif
     @stack('scripts')
 </body>
 </html>

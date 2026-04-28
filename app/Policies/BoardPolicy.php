@@ -29,10 +29,9 @@ class BoardPolicy
             return false;
         }
 
-        $canCreate = $tenant->hasFeature('board-creation');
         $underLimit = $tenant->hasFeature('unlimited-boards') || !$tenant->hasReachedLimit('boards');
 
-        return $canCreate && $underLimit && $user->hasRole('Team Supervisor');
+        return $underLimit;
     }
 
     public function update(User $user, Board $board): bool
@@ -55,4 +54,3 @@ class BoardPolicy
             && $tenant->hasFeature('role-permissions');
     }
 }
-

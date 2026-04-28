@@ -2,6 +2,7 @@
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Models\ActivityLog;
 use App\Models\Board;
 use App\Models\Task;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -38,11 +39,15 @@ new class extends Component {
         $capstoneTasks = $this->collectCapstoneTasks();
 
         if ($tenant && $canViewReporting) {
-            $completedPeriod = DB::connection('tenant')
-                ->table('activity_logs as al')
-                ->join('stages as ns', 'ns.id', '=', 'al.new_stage_id')
-                ->whereRaw('LOWER(ns.name) in ("done","completed","complete","resolved","published")')
-                ->where('al.created_at', '>=', $periodStart)
+            $completedPeriod = ActivityLog::query()
+                ->with('newStage:id,name')
+                ->where('created_at', '>=', $periodStart)
+                ->get()
+                ->filter(function (ActivityLog $log) {
+                    $stageName = Str::lower((string) ($log->new_stage_name_snapshot ?: ($log->newStage?->name ?? '')));
+
+                    return in_array($stageName, ['done', 'completed', 'complete', 'resolved', 'published'], true);
+                })
                 ->count();
 
             $dbTotalTasks = Task::count();
@@ -104,16 +109,9 @@ new class extends Component {
         abort_unless($tenant && $tenant->hasFeature('advanced-reporting'), 403);
 
         $dbRows = Task::query()
-            ->leftJoin('stages', 'stages.id', '=', 'tasks.stage_id')
-            ->leftJoin('boards', 'boards.id', '=', 'tasks.board_id')
-            ->select([
-                'tasks.id',
-                'tasks.title',
-                'boards.name as board_name',
-                'stages.name as stage_name',
-                'tasks.due_date',
-                'tasks.created_at',
-                'tasks.updated_at',
+            ->with([
+                'board:id,name',
+                'stage:id,name',
             ])
             ->orderByDesc('tasks.id')
             ->get();
@@ -137,7 +135,16 @@ new class extends Component {
                 $dueDate = filled($row->due_date) && $row->due_date !== '-'
                     ? Carbon::parse($row->due_date)
                     : null;
-                $stage = Str::lower((string) ($row->stage_name ?? ''));
+                $title = $row instanceof Task
+                    ? (string) ($row->title ?? '')
+                    : (string) ($row->title ?? '');
+                $boardName = $row instanceof Task
+                    ? (string) ($row->board?->name ?? '')
+                    : (string) ($row->board_name ?? '');
+                $stageName = $row instanceof Task
+                    ? (string) ($row->stage?->name ?? '')
+                    : (string) ($row->stage_name ?? '');
+                $stage = Str::lower($stageName);
                 $isCompleted = in_array($stage, ['done', 'completed', 'complete', 'resolved', 'published'], true);
 
                 $status = $isCompleted
@@ -146,9 +153,9 @@ new class extends Component {
 
                 return (object) [
                     'id' => (string) ($row->id ?? '-'),
-                    'title' => $this->readableValue((string) ($row->title ?? ''), 'Untitled task', 120),
-                    'board_name' => $this->readableValue((string) ($row->board_name ?? ''), 'N/A', 70),
-                    'stage_name' => $this->readableValue((string) ($row->stage_name ?? ''), 'N/A', 40),
+                    'title' => $this->readableValue($title, 'Untitled task', 120),
+                    'board_name' => $this->readableValue($boardName, 'N/A', 70),
+                    'stage_name' => $this->readableValue($stageName, 'N/A', 40),
                     'due_date' => $dueDate ? $dueDate->format('M d, Y') : '-',
                     'created_at' => $this->formatTimestamp($row->created_at ?? null),
                     'updated_at' => $this->formatTimestamp($row->updated_at ?? null),
@@ -161,11 +168,13 @@ new class extends Component {
         $filename = 'advanced-report-' . strtolower($tenant->domain ?? 'tenant') . '-' . $generatedAt->format('Ymd_His') . '.pdf';
 
         $pdf = Pdf::loadView('pdf.advanced-report', [
-            'title' => 'Advanced Report',
+            'title' => 'Task Performance Report',
             'tenantName' => (string) ($tenant->name ?? 'Workspace'),
             'tenantDomain' => (string) ($tenant->domain ?? 'tenant'),
             'generatedAt' => $generatedAt,
             'periodLabel' => $this->reportRangeLabel(),
+            'preparedBy' => auth()->user()?->name ?? 'Workspace Admin',
+            'reportPurpose' => 'Task performance summary and status insights for the workspace.',
             'rows' => $rows,
             'summary' => [
                 'total_tasks' => (int) $rows->count(),
@@ -192,33 +201,31 @@ new class extends Component {
         $tenant = app('currentTenant');
         abort_unless($tenant && $tenant->hasFeature('audit-export'), 403);
 
-        $rows = DB::connection('tenant')
-            ->table('activity_logs as al')
-            ->leftJoin('tasks as t', 't.id', '=', 'al.task_id')
-            ->leftJoin('stages as os', 'os.id', '=', 'al.old_stage_id')
-            ->leftJoin('stages as ns', 'ns.id', '=', 'al.new_stage_id')
-            ->leftJoin('users as u', 'u.id', '=', 'al.user_id')
-            ->select([
-                'al.id',
-                'al.created_at',
-                'u.name as actor_name',
-                't.title as task_title',
-                'os.name as old_stage_name',
-                'ns.name as new_stage_name',
-                'al.ip_address',
+        $rows = ActivityLog::query()
+            ->with([
+                'user:id,name',
+                'task:id,title,board_id',
+                'oldStage:id,name',
+                'newStage:id,name',
             ])
-            ->orderByDesc('al.id')
+            ->orderByDesc('id')
             ->get();
 
         $preparedRows = $rows
             ->map(function ($row) {
+                $taskTitle = (string) ($row->task_title_snapshot ?: ($row->task?->title ?? ''));
+                $oldStageName = (string) ($row->old_stage_name_snapshot ?: ($row->oldStage?->name ?? ''));
+                $newStageName = (string) ($row->new_stage_name_snapshot ?: ($row->newStage?->name ?? ''));
+                $actionSummary = trim("Moved from {$oldStageName} to {$newStageName}");
+
                 return (object) [
                     'id' => (int) ($row->id ?? 0),
                     'created_at' => $this->formatTimestamp($row->created_at ?? null),
-                    'actor_name' => $this->readableValue((string) ($row->actor_name ?? ''), 'Unknown user', 70),
-                    'task_title' => $this->readableValue((string) ($row->task_title ?? ''), 'Unknown task', 120),
-                    'old_stage_name' => $this->readableValue((string) ($row->old_stage_name ?? ''), 'Previous stage', 40),
-                    'new_stage_name' => $this->readableValue((string) ($row->new_stage_name ?? ''), 'New stage', 40),
+                    'actor_name' => $this->readableValue((string) ($row->user?->name ?? ''), 'Unknown user', 70),
+                    'task_title' => $this->readableValue($taskTitle, 'Unknown task', 120),
+                    'action_summary' => $this->readableValue($actionSummary ?: 'Task update', 'Task update', 100),
+                    'old_stage_name' => $this->readableValue($oldStageName, 'Previous stage', 40),
+                    'new_stage_name' => $this->readableValue($newStageName, 'New stage', 40),
                     'ip_address' => $this->readableValue((string) ($row->ip_address ?? ''), '-', 45),
                 ];
             })
@@ -228,11 +235,13 @@ new class extends Component {
         $filename = 'audit-export-' . strtolower($tenant->domain ?? 'tenant') . '-' . $generatedAt->format('Ymd_His') . '.pdf';
 
         $pdf = Pdf::loadView('pdf.audit-report', [
-            'title' => 'Audit Report',
+            'title' => 'Audit Trail Report',
             'tenantName' => (string) ($tenant->name ?? 'Workspace'),
             'tenantDomain' => (string) ($tenant->domain ?? 'tenant'),
             'generatedAt' => $generatedAt,
-            'scopeLabel' => 'Workspace Activity Logs',
+            'preparedBy' => auth()->user()?->name ?? 'Workspace Admin',
+            'reportPurpose' => 'Task movement audit trail with actor, stage transition and IP details.',
+            'scopeLabel' => 'Workflow activity audit trail',
             'rows' => $preparedRows,
             'summary' => [
                 'total' => (int) $preparedRows->count(),

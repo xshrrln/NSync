@@ -80,7 +80,6 @@
             class="absolute -top-1 -right-1 block h-5 w-5 rounded-full ring-2 ring-white bg-red-500 text-xs text-white flex items-center justify-center font-bold"
         >
             <span x-text="unreadCount">{{ $notificationCount }}</span>
-        </span>
     </button>
 
     <div
@@ -131,6 +130,12 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/>
                                     </svg>
                                 </div>
+                            @elseif($type === 'support-ticket')
+                                <div class="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-4l-4 4v-4z"/>
+                                    </svg>
+                                </div>
                             @else
                                 <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
                                     <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -170,7 +175,6 @@
                             </svg>
                         </button>
                     </div>
-                </div>
             @empty
                 <div class="p-8 text-center text-gray-500">
                     <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -180,5 +184,4 @@
                 </div>
             @endforelse
         </div>
-    </div>
 </div>

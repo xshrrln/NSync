@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>NSync - Multi-Tenant Team Task Board Platform</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/favicon-logo.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         html {
@@ -24,6 +25,15 @@
     </style>
 </head>
 <body class="antialiased bg-white text-gray-900">
+    @php
+        $registerPrefill = array_filter(request()->only([
+            'org_name',
+            'org_address',
+            'org_domain',
+            'name',
+            'email',
+        ]), fn ($value) => filled($value));
+    @endphp
     <div class="min-h-screen flex flex-col">
         <header class="w-full border-b border-gray-100 bg-white shadow-sm fixed top-0 inset-x-0 z-50">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between gap-6">
@@ -33,7 +43,7 @@
                 <nav class="flex items-center gap-4 text-sm font-semibold text-gray-800 flex-wrap justify-end">
                     <a href="#features" class="hover:text-gray-900">Features</a>
                     <a href="#pricing" class="hover:text-gray-900">Pricing</a>
-                    <a href="{{ route('login') }}" class="px-4 py-2 rounded-full border border-gray-300 text-gray-800 hover:border-gray-400 hover:bg-gray-50 transition">Log in</a>
+                    <a href="{{ route('login', absolute: false) }}" class="px-4 py-2 rounded-full border border-gray-300 text-gray-800 hover:border-gray-400 hover:bg-gray-50 transition">Log in</a>
                     <a href="#pricing" class="px-4 py-2 rounded-full bg-green-600 text-white shadow hover:bg-green-700 transition">Get started</a>
                 </nav>
             </div>
@@ -146,10 +156,15 @@
                                     @endforeach
                                 </ul>
                                 <div class="mt-auto">
+                                    @php
+                                        $registerUrl = route('register', absolute: false) . '?' . http_build_query(array_merge($registerPrefill, [
+                                            'plan' => $plan,
+                                        ]));
+                                    @endphp
                                     @if($plan === 'free')
-                                        <a href="{{ route('register') }}?plan=free" class="w-full block bg-green-600 text-white text-center py-4 rounded-xl font-bold hover:bg-green-700">Start Free Trial</a>
+                                        <a href="{{ $registerUrl }}" class="w-full block bg-green-600 text-white text-center py-4 rounded-xl font-bold hover:bg-green-700">Start Free Trial</a>
                                     @else
-                                        <a href="{{ route('register') }}?plan={{ $plan }}" class="w-full block border-2 border-gray-200 text-gray-900 text-center py-4 rounded-xl font-bold hover:bg-gray-50">Choose {{ ucfirst($plan) }}</a>
+                                        <a href="{{ $registerUrl }}" class="w-full block border-2 border-gray-200 text-gray-900 text-center py-4 rounded-xl font-bold hover:bg-gray-50">Choose {{ ucfirst($plan) }}</a>
                                     @endif
                                 </div>
                             </div>
@@ -170,14 +185,14 @@
                     <ul class="space-y-2 text-sm text-gray-400">
                         <li><a href="#features" class="hover:text-white">Features</a></li>
                         <li><a href="#pricing" class="hover:text-white">Pricing</a></li>
-                        <li><a href="{{ route('login') }}" class="hover:text-white">Log in</a></li>
+                        <li><a href="{{ route('login', absolute: false) }}" class="hover:text-white">Log in</a></li>
                     </ul>
                 </div>
                 <div>
                     <p class="text-sm font-semibold mb-3 text-white">Company</p>
                     <ul class="space-y-2 text-sm text-gray-400">
-                        <li><a href="{{ route('register') }}" class="hover:text-white">Get started</a></li>
-                        <li><a href="{{ route('login') }}" class="hover:text-white">Support</a></li>
+                        <li><a href="{{ route('register', absolute: false) }}" class="hover:text-white">Get started</a></li>
+                        <li><a href="{{ route('login', absolute: false) }}" class="hover:text-white">Support</a></li>
                     </ul>
                 </div>
             </div>

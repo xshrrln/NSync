@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
+use Illuminate\Support\Facades\Auth;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,6 +18,36 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('tasks:send-due-reminders')->dailyAt('08:00');
     })
 ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectTo(
+            guests: fn () => route('login', absolute: false),
+            users: function (Request $request): string {
+                $user = Auth::user();
+
+                if (! $user) {
+                    return route('landing', absolute: false);
+                }
+
+                if ($user->email === 'admin@nsync.com' || $user->hasRole('Platform Administrator')) {
+                    $port = parse_url(config('app.url'), PHP_URL_PORT) ?: $request->getPort() ?: 8000;
+                    $portSegment = $port && $port !== 80 && $port !== 443 ? ':' . $port : '';
+
+                    return "http://nsync.localhost{$portSegment}/dashboard";
+                }
+
+                if ($user->tenant) {
+                    $port = parse_url(config('app.url'), PHP_URL_PORT) ?: $request->getPort() ?: 8000;
+                    $portSegment = $port && $port !== 80 && $port !== 443 ? ':' . $port : '';
+                    $tenantHost = str_contains((string) $user->tenant->domain, '.')
+                        ? $user->tenant->domain
+                        : "{$user->tenant->domain}.localhost";
+
+                    return "http://{$tenantHost}{$portSegment}/dashboard";
+                }
+
+                return route('pending-approval', absolute: false);
+            }
+        );
+
         $middleware->alias([
             'tenant' => \App\Http\Middleware\IdentifyTenant::class,
             'approved' => \App\Http\Middleware\EnsureTenantApproved::class,
@@ -34,13 +65,14 @@ return Application::configure(basePath: dirname(__DIR__))
         
         $middleware->web(append: [
             \App\Http\Middleware\IdentifyTenant::class,
+            \App\Http\Middleware\AdminAuditRequestLogger::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (TokenMismatchException $e, Request $request) {
             if ($request->is('login')) {
                 return redirect()
-                    ->route('login')
+                    ->to(route('login', absolute: false))
                     ->withErrors([
                         'email' => 'User does not exist. Make sure you belong in this organization.',
                     ])

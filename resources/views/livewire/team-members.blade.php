@@ -5,8 +5,10 @@ use App\Models\User;
 use App\Models\Tenant;
 use App\Models\PendingInvite;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Mail\TeamInvite;
 
@@ -36,15 +38,22 @@ new class extends Component {
         // Fetch members with search filter
         $members = collect();
         if ($tenant) {
-            $members = User::where('tenant_id', $tenant->id)
+            $memberQuery = User::where('tenant_id', $tenant->id)
                 ->when($this->search, function($q) {
                     $q->where(function($sub) {
                         $sub->where('name', 'like', '%' . $this->search . '%')
                             ->orWhere('email', 'like', '%' . $this->search . '%');
                     });
-                })
-                ->latest()
-                ->get();
+                });
+
+            if (Schema::hasColumn((new User())->getTable(), 'status')) {
+                $memberQuery->orderByRaw("CASE WHEN status = 'disabled' THEN 1 ELSE 0 END")
+                    ->orderByDesc('created_at');
+            } else {
+                $memberQuery->latest();
+            }
+
+            $members = $memberQuery->get();
         }
 
         return [
@@ -407,19 +416,12 @@ new class extends Component {
         if ($sharedXmlRaw !== '') {
             $sharedXml = @simplexml_load_string($sharedXmlRaw);
             if ($sharedXml !== false) {
-                $sharedXml->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
-
-                $sharedStringItems = $sharedXml->xpath('//x:si');
-                if (! is_array($sharedStringItems) || empty($sharedStringItems)) {
-                    $sharedStringItems = $sharedXml->xpath('//si') ?: [];
-                }
+                // Namespace-safe XPath: avoids "Undefined namespace prefix" across XLSX variants.
+                $sharedStringItems = $sharedXml->xpath('//*[local-name()="si"]') ?: [];
 
                 foreach ($sharedStringItems as $si) {
                     $fragments = [];
-                    $textNodes = $si->xpath('.//x:t');
-                    if (! is_array($textNodes) || empty($textNodes)) {
-                        $textNodes = $si->xpath('.//t') ?: [];
-                    }
+                    $textNodes = $si->xpath('.//*[local-name()="t"]') ?: [];
 
                     foreach ($textNodes as $node) {
                         $fragments[] = (string) $node;
@@ -445,39 +447,26 @@ new class extends Component {
                 continue;
             }
 
-            $sheetXml->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
-            $cells = $sheetXml->xpath('//x:c');
-            if (! is_array($cells) || empty($cells)) {
-                $cells = $sheetXml->xpath('//c') ?: [];
-            }
+            $cells = $sheetXml->xpath('//*[local-name()="c"]') ?: [];
 
             foreach ($cells as $cell) {
                 $cellType = (string) ($cell['t'] ?? '');
                 $value = '';
 
                 if ($cellType === 's') {
-                    $sharedValueNodes = $cell->xpath('./x:v');
-                    if (! is_array($sharedValueNodes) || empty($sharedValueNodes)) {
-                        $sharedValueNodes = $cell->xpath('./v') ?: [];
-                    }
+                    $sharedValueNodes = $cell->xpath('./*[local-name()="v"]') ?: [];
                     $sharedIndex = isset($sharedValueNodes[0]) ? (int) $sharedValueNodes[0] : -1;
                     $value = (string) ($sharedStrings[$sharedIndex] ?? '');
                 } elseif ($cellType === 'inlineStr') {
                     $fragments = [];
-                    $textNodes = $cell->xpath('.//x:t');
-                    if (! is_array($textNodes) || empty($textNodes)) {
-                        $textNodes = $cell->xpath('.//t') ?: [];
-                    }
+                    $textNodes = $cell->xpath('.//*[local-name()="t"]') ?: [];
 
                     foreach ($textNodes as $node) {
                         $fragments[] = (string) $node;
                     }
                     $value = implode('', $fragments);
                 } else {
-                    $valueNodes = $cell->xpath('./x:v');
-                    if (! is_array($valueNodes) || empty($valueNodes)) {
-                        $valueNodes = $cell->xpath('./v') ?: [];
-                    }
+                    $valueNodes = $cell->xpath('./*[local-name()="v"]') ?: [];
                     $value = isset($valueNodes[0]) ? (string) $valueNodes[0] : '';
                 }
 
@@ -492,7 +481,7 @@ new class extends Component {
         return $text;
     }
 
-    public function remove($userId) {
+    public function archive($userId) {
         if (! $this->ensureSubscriptionAccess()) {
             return;
         }
@@ -503,7 +492,22 @@ new class extends Component {
 
         $user = User::where('id', $userId)->where('tenant_id', app('currentTenant')?->id)->first();
         if ($user && $user->id !== Auth::id()) {
-            $user->delete();
+            if (Schema::hasColumn($user->getTable(), 'status')) {
+                $user->status = 'disabled';
+                $user->save();
+            }
+
+            if (Schema::connection('tenant')->hasTable('users') && Schema::connection('tenant')->hasColumn('users', 'status')) {
+                DB::connection('tenant')
+                    ->table('users')
+                    ->where('email', $user->email)
+                    ->update([
+                        'status' => 'disabled',
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            $this->dispatch('notify', message: "{$user->name} archived successfully.", type: 'success');
         }
     }
 }; ?>
@@ -564,20 +568,25 @@ new class extends Component {
                             <th class="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wide">Member</th>
                             <th class="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wide">Role</th>
                             <th class="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wide">Joined</th>
+                            <th class="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wide">Status</th>
                             <th class="px-6 py-4 w-24"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @forelse($members as $user)
-                            <tr class="hover:bg-gray-50/50 transition-colors" wire:key="user-{{ $user->id }}">
+                            @php
+                                $memberStatus = $user->status ?? 'active';
+                                $isArchived = $memberStatus === 'disabled';
+                            @endphp
+                            <tr class="transition-colors {{ $isArchived ? 'bg-gray-50/70 text-gray-500' : 'hover:bg-gray-50/50' }}" wire:key="user-{{ $user->id }}">
                                 <td class="px-6 py-4">
                                     <div class="flex items-center">
-                                        <div class="w-10 h-10 bg-nsync-green-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-xs {{ $isArchived ? 'bg-gray-400' : 'bg-nsync-green-600' }}">
                                             {{ strtoupper(substr($user->name, 0, 2)) }}
                                         </div>
                                         <div class="ml-4">
-                                            <div class="text-sm font-bold text-gray-900">{{ $user->name }}</div>
-                                            <div class="text-xs text-gray-500">{{ $user->email }}</div>
+                                            <div class="text-sm font-bold {{ $isArchived ? 'text-gray-500' : 'text-gray-900' }}">{{ $user->name }}</div>
+                                            <div class="text-xs {{ $isArchived ? 'text-gray-400' : 'text-gray-500' }}">{{ $user->email }}</div>
                                         </div>
                                     </div>
                                 </td>
@@ -589,9 +598,16 @@ new class extends Component {
                                 <td class="px-6 py-4 text-xs text-gray-500">
                                     {{ $user->created_at->format('M d, Y') }}
                                 </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full {{ $isArchived ? 'bg-gray-200 text-gray-700 border border-gray-300' : 'bg-emerald-50 text-emerald-700 border border-emerald-100' }}">
+                                        {{ $isArchived ? 'Disabled' : 'Active' }}
+                                    </span>
+                                </td>
                                 <td class="px-6 py-4 text-right">
-                                    @if($canManageMembers && $user->id !== auth()->id())
-                                        <button wire:click="remove({{ $user->id }})" wire:confirm="Are you sure you want to remove this member?" class="text-sm font-semibold text-red-500 hover:text-red-700 transition">Remove</button>
+                                    @if($canManageMembers && $user->id !== auth()->id() && ! $isArchived)
+                                        <button wire:click="archive({{ $user->id }})" wire:confirm="Are you sure you want to archive this member?" class="text-sm font-semibold text-amber-600 hover:text-amber-700 transition">Archive</button>
+                                    @elseif($isArchived)
+                                        <span class="text-sm font-semibold text-gray-400">Archived</span>
                                     @elseif($user->id === auth()->id())
                                         <span class="text-sm font-semibold text-gray-400">You</span>
                                     @else
@@ -601,7 +617,7 @@ new class extends Component {
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="px-6 py-20 text-center">
+                                <td colspan="5" class="px-6 py-20 text-center">
                                     <p class="text-gray-400 text-sm">No members found matching your search.</p>
                                 </td>
                             </tr>

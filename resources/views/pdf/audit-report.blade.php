@@ -5,11 +5,18 @@
     <title>{{ $title ?? 'Audit Report' }}</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; color: #0f172a; font-size: 12px; }
-        .header { border: 1px solid #d1fae5; background: #f0fdf4; padding: 12px 14px; margin-bottom: 12px; }
-        .title { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
-        .meta { font-size: 11px; color: #334155; margin: 2px 0; }
-        .summary { margin: 0 0 12px; border-collapse: collapse; width: 100%; }
-        .summary td { border: 1px solid #cbd5e1; padding: 8px; width: 33.33%; }
+        .cover-page { min-height: 100vh; padding: 40px; display: flex; flex-direction: column; justify-content: center; }
+        .cover-graphic { width: 100%; height: 140px; background: linear-gradient(135deg, #064e3b 30%, #10b981 30%, #10b981 48%, #ecfdf5 48%, #ecfdf5 100%); margin-bottom: 32px; }
+        .cover-tag { margin: 0; font-size: 11px; letter-spacing: 0.32em; text-transform: uppercase; color: #065f46; }
+        .cover-title { font-size: 46px; font-weight: 800; margin: 16px 0 14px; line-height: 1.05; color: #0f172a; }
+        .cover-description { margin: 0 0 28px; font-size: 14px; color: #334155; max-width: 520px; }
+        .cover-meta p { margin: 0 0 10px; font-size: 13px; color: #475569; }
+        .page-break { page-break-after: always; }
+        .header { border: 1px solid #d1fae5; background: #f0fdf4; padding: 16px 18px; margin-bottom: 14px; }
+        .title { font-size: 20px; font-weight: 700; margin: 0 0 6px; }
+        .meta { font-size: 11px; color: #334155; margin: 3px 0; }
+        .summary { margin: 0 0 14px; border-collapse: collapse; width: 100%; }
+        .summary td { border: 1px solid #cbd5e1; padding: 10px; width: 33.33%; }
         .label { font-size: 10px; color: #475569; text-transform: uppercase; }
         .value { font-size: 16px; font-weight: 700; margin-top: 4px; }
         table.report { border-collapse: collapse; width: 100%; }
@@ -19,6 +26,7 @@
     </style>
 </head>
 <body>
+    @include('pdf.cover-page')
     <div class="header">
         <p class="title">{{ $title ?? 'Audit Report' }}</p>
         <p class="meta"><strong>Workspace:</strong> {{ $tenantName ?? 'Workspace' }} ({{ $tenantDomain ?? 'tenant' }})</p>
@@ -47,12 +55,13 @@
         <thead>
             <tr>
                 <th style="width:6%;">ID</th>
-                <th style="width:14%;">Timestamp</th>
-                <th style="width:14%;">Actor</th>
-                <th style="width:24%;">Task</th>
-                <th style="width:13%;">From Stage</th>
-                <th style="width:13%;">To Stage</th>
-                <th style="width:16%;">IP Address</th>
+                <th style="width:12%;">Timestamp</th>
+                <th style="width:12%;">Actor</th>
+                <th style="width:22%;">Task</th>
+                <th style="width:18%;">Action</th>
+                <th style="width:12%;">From Stage</th>
+                <th style="width:12%;">To Stage</th>
+                <th style="width:14%;">IP Address</th>
             </tr>
         </thead>
         <tbody>
@@ -62,13 +71,14 @@
                     <td>{{ $row->created_at }}</td>
                     <td>{{ $row->actor_name }}</td>
                     <td>{{ $row->task_title }}</td>
+                    <td>{{ $row->action_summary ?? 'Task update' }}</td>
                     <td>{{ $row->old_stage_name }}</td>
                     <td>{{ $row->new_stage_name }}</td>
                     <td>{{ $row->ip_address }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7">No audit records available.</td>
+                    <td colspan="8">No audit records available.</td>
                 </tr>
             @endforelse
         </tbody>

@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\TwoFactorChallengeController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminSettingsController;
+use App\Models\Tenant;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Volt;
 
@@ -27,7 +29,7 @@ Route::get('/', function () {
         }
 
         if (! $user->tenant) {
-            return redirect()->to(route('pending-approval', absolute: false));
+            return redirect()->to(route('landing', absolute: false));
         }
 
         $port = parse_url(config('app.url'), PHP_URL_PORT) ?: request()->getPort() ?: 8000;
@@ -52,26 +54,12 @@ Route::view('/pending-approval', 'auth.pending-approval')->name('pending-approva
 
 // 2. Admin routes: register central dashboard before generic workspace routes so
 // nsync.localhost/dashboard resolves to the admin page instead of the tenant Volt page.
-Route::domain('nsync.localhost')->middleware(['auth', 'verified', 'platform_admin'])->get('/dashboard', function () {
-    $tenantsCount = \App\Models\Tenant::count();
-    $pendingCount = \App\Models\Tenant::where('status', 'pending')->count();
-    $activeCount = \App\Models\Tenant::where('status', 'active')->count();
-    $suspendedCount = \App\Models\Tenant::where('status', 'disabled')->count();
-    
-    return view('admin.dashboard', compact('tenantsCount', 'pendingCount', 'activeCount', 'suspendedCount'));
-})->name('admin.dashboard');
+Route::domain('nsync.localhost')->middleware(['auth', 'verified', 'platform_admin'])->get('/dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
 
 Route::domain('nsync.localhost')->middleware(['auth', 'verified', 'platform_admin'])->prefix('admin')->name('admin.')->group(function () {
     
-    Route::get('/dashboard', function () {
-        $tenantsCount = \App\Models\Tenant::count();
-        $pendingCount = \App\Models\Tenant::where('status', 'pending')->count();
-        $activeCount = \App\Models\Tenant::where('status', 'active')->count();
-        $suspendedCount = \App\Models\Tenant::where('status', 'disabled')->count();
-        
-        // FIXED: Using 'admin.dashboard' to target resources/views/admin/dashboard.blade.php
-        return view('admin.dashboard', compact('tenantsCount', 'pendingCount', 'activeCount', 'suspendedCount'));
-    })->name('dashboard');
+    Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/audit-trail/export', [AdminDashboardController::class, 'exportAuditTrail'])->name('audit-trail.export');
     
     Route::get('/tenants', [TenantController::class, 'index'])->name('tenants.index');
     Route::patch('/tenants/{tenant}/approve', [TenantController::class, 'approve'])->name('tenants.approve');

@@ -60,7 +60,7 @@
                     </svg>
                     Open Gmail
                 </a>
-                <a href="{{ route('login') }}" class="inline-flex items-center rounded-lg border border-emerald-600 px-6 py-2 text-sm font-medium text-emerald-700 transition hover:text-emerald-800">
+                <a href="{{ route('login', absolute: false) }}" class="inline-flex items-center rounded-lg border border-emerald-600 px-6 py-2 text-sm font-medium text-emerald-700 transition hover:text-emerald-800">
                     &larr; Back to Login
                 </a>
             </div>

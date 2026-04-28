@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Tenant;
+use App\Support\AdminAuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -281,7 +282,7 @@ class TenantController extends Controller
         );
 
         if ($emailSent) {
-            return back()->with('success', "Tenant '{$tenant->name}' suspended. Notification sent.");
+            return back()->with('success', "Tenant '{$tenant->name}' suspended.");
         }
 
         return back()->with('warning', "Tenant '{$tenant->name}' suspended, but suspension email could not be delivered.");
@@ -296,7 +297,7 @@ class TenantController extends Controller
         return back()->with('success', "Tenant '{$tenant->name}' resumed.");
     }
 
-    public function upgradePlan(Tenant $tenant, Request $request)
+    public function upgradePlan(Tenant $tenant, Request $request, AdminAuditLogger $auditLogger)
     {
         $this->authorize('update', $tenant);
 
@@ -314,6 +315,26 @@ class TenantController extends Controller
             'start_date' => now()->toDateString(),
             'due_date' => now()->addDays($this->planDurationDays($request->plan))->toDateString(),
         ]);
+
+        $request->attributes->set('audit_log_handled', true);
+
+        $auditLogger->log(
+            user: $request->user(),
+            action: 'Tenant plan changed',
+            description: "Changed {$tenant->name} from {$oldPlan} to {$request->plan}.",
+            request: $request,
+            context: [
+                'audience' => 'admin',
+                'tenant_id' => $tenant->id,
+                'tenant_name' => $tenant->name,
+                'tenant_domain' => $tenant->domain,
+                'old_plan' => $oldPlan,
+                'new_plan' => $request->plan,
+            ],
+            statusCode: 302,
+            subjectType: 'Tenant',
+            subjectId: $tenant->id,
+        );
 
         // Log subscription change (stub for Stripe webhook)
         \Log::info('Plan upgraded', [

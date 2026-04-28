@@ -15,10 +15,13 @@ class ActivityLog extends Model
 
     protected $fillable = [
         'user_id',
-        'task_id', 
+        'task_id',
         'old_stage_id',
         'new_stage_id',
-        'ip_address'
+        'ip_address',
+        'task_title_snapshot',
+        'old_stage_name_snapshot',
+        'new_stage_name_snapshot',
     ];
 
     protected $casts = [
@@ -60,4 +63,3 @@ class ActivityLog extends Model
         return $this->belongsTo(Stage::class, 'new_stage_id');
     }
 }
-

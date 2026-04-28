@@ -1,5 +1,6 @@
 <?php
 use Livewire\Volt\Component;
+use Livewire\Attributes\Layout;
 use App\Models\PendingInvite;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -7,7 +8,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-new class extends Component {
+new #[Layout('layouts.guest')] class extends Component {
     public $token;
     public $name = '';
     public $password = '';
@@ -44,6 +45,7 @@ new class extends Component {
                 'password' => bcrypt($this->password),
                 'tenant_id' => $tenantId,
                 'email_verified_at' => now(),
+                'status' => 'active',
             ]);
             $user = $existingUser;
         } else {
@@ -53,6 +55,7 @@ new class extends Component {
                 'password' => bcrypt($this->password),
                 'tenant_id' => $tenantId,
                 'email_verified_at' => now(),
+                'status' => 'active',
             ]);
         }
 
@@ -62,10 +65,16 @@ new class extends Component {
 
         $this->invite->delete();
 
-        Auth::login($user);
+        if (Auth::check()) {
+            Auth::logout();
+            request()->session()->invalidate();
+            request()->session()->regenerateToken();
+        }
 
-        session()->flash('message', 'Welcome to the team!');
-        return redirect()->route('dashboard');
+        return redirect()->to($this->tenantLoginUrl($this->invite->tenant, [
+            'accepted' => 1,
+            'email' => $user->email,
+        ]));
     }
 
     public function with() {
@@ -110,16 +119,29 @@ new class extends Component {
         if (Schema::connection('tenant')->hasColumn('users', 'email_verified_at')) {
             $payload['email_verified_at'] = now();
         }
+        if (Schema::connection('tenant')->hasColumn('users', 'status')) {
+            $payload['status'] = 'active';
+        }
 
         DB::connection('tenant')->table('users')->updateOrInsert(
             ['email' => $centralUser->email],
             $payload
         );
     }
+
+    private function tenantLoginUrl($tenant, array $query = []): string
+    {
+        $appUrl = (string) config('app.url', 'http://localhost:8000');
+        $parts = parse_url($appUrl);
+        $scheme = $parts['scheme'] ?? 'http';
+        $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+        $base = $scheme . '://' . $tenant->domain . $port . '/login';
+
+        return $query === [] ? $base : $base . '?' . http_build_query($query);
+    }
 }; ?>
 
-<x-guest-layout>
-        <div class="w-full">
+<div class="w-full">
             <div class="mb-10 text-center">
                 <h2 class="text-2xl font-bold tracking-tight text-gray-900">Accept Your Invite</h2>
                 <p class="mt-2 text-sm text-gray-600">Join {{ $invite->tenant->name }} as {{ ucfirst(str_replace('_', ' ', $inviteRole)) }}.</p>
@@ -139,18 +161,17 @@ new class extends Component {
 
                 <div class="space-y-2">
                     <label for="password" class="block text-sm font-semibold text-gray-700">Password</label>
-                    <input type="password" wire:model="password" id="password" placeholder="Create password" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm outline-none transition-all focus:border-transparent focus:ring-2" style="--tw-ring-color: var(--tenant-primary);">
+                    <x-password-input wire:model="password" id="password" placeholder="Create password" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm outline-none transition-all focus:border-transparent focus:ring-2" style="--tw-ring-color: var(--tenant-primary);" />
                     @error('password') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                 </div>
 
                 <div class="space-y-2">
                     <label for="password_confirmation" class="block text-sm font-semibold text-gray-700">Confirm Password</label>
-                    <input type="password" wire:model="password_confirmation" id="password_confirmation" placeholder="Confirm password" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm outline-none transition-all focus:border-transparent focus:ring-2" style="--tw-ring-color: var(--tenant-primary);">
+                    <x-password-input wire:model="password_confirmation" id="password_confirmation" placeholder="Confirm password" class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 placeholder-gray-500 shadow-sm outline-none transition-all focus:border-transparent focus:ring-2" style="--tw-ring-color: var(--tenant-primary);" />
                 </div>
 
-                <button type="submit" class="w-full rounded-xl bg-green-600 py-3.5 text-sm font-bold text-white shadow-md transition-all hover:bg-green-700 active:scale-[0.98]">
+                <button type="submit" class="w-full rounded-xl py-3.5 text-sm font-bold text-white shadow-md transition-all active:scale-[0.98]" style="background-color: var(--tenant-primary);">
                     Accept Invite & Join Workspace
                 </button>
             </form>
-        </div>
-</x-guest-layout>
+</div>

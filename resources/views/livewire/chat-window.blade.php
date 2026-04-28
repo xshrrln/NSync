@@ -2,6 +2,7 @@
 use Livewire\Volt\Component;
 use App\Models\Message;
 use App\Models\Tenant;
+use App\Support\SupportAdminNotifier;
 use Illuminate\Support\Facades\Auth;
 
 new class extends Component {
@@ -16,20 +17,41 @@ new class extends Component {
     }
 
     public function sendMessage() {
-        if (trim($this->newMessage)) {
-            Message::create([
-                'tenant_id' => app('currentTenant')->id,
-                'user_id' => Auth::id(),
-                'message' => trim($this->newMessage),
-            ]);
-            $this->newMessage = '';
-            $this->dispatch('refresh-chat');
+        $tenant = app('currentTenant');
+        if (! $tenant) {
+            return;
         }
+
+        $text = trim($this->newMessage);
+        if ($text === '') {
+            return;
+        }
+
+        $message = Message::create([
+            'room_id' => $tenant->id,
+            'sender_id' => Auth::id(),
+            'message' => $text,
+        ]);
+
+        app(SupportAdminNotifier::class)->notifyTenantChatMessage(
+            $tenant,
+            $message,
+            Auth::user()?->name
+        );
+
+        $this->newMessage = '';
+        $this->dispatch('refresh-chat');
     }
 
     public function mount() {
-        $this->messages = Message::where('tenant_id', app('currentTenant')->id)
-            ->with('user')
+        $tenant = app('currentTenant');
+        if (! $tenant) {
+            $this->messages = collect();
+            return;
+        }
+
+        $this->messages = Message::where('room_id', $tenant->id)
+            ->with('sender')
             ->latest()
             ->take(50)
             ->get()

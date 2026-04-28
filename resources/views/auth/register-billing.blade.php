@@ -5,7 +5,7 @@
         <p class="text-base text-gray-600 mt-2">Finish setting up your workspace by adding your billing details.</p>
     </div>
 
-    <form method="POST" action="{{ route('register.billing.store') }}" class="space-y-6">
+    <form method="POST" action="{{ route('register.billing.store', absolute: false) }}" class="space-y-6">
         @csrf
 
         <div class="space-y-2">
@@ -113,7 +113,7 @@
         </div>
 
         <div class="flex items-center justify-between pt-2">
-            <a class="text-sm text-gray-600 hover:text-gray-900 underline underline-offset-4" href="{{ route('register') }}">
+            <a class="text-sm text-gray-600 hover:text-gray-900 underline underline-offset-4" href="{{ route('register', absolute: false) }}">
                 Back to organization details
             </a>
 

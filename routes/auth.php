@@ -11,19 +11,19 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('register', [RegisteredUserController::class, 'create'])
+    ->name('register');
+
+Route::post('register', [RegisteredUserController::class, 'store'])
+    ->name('register.store');
+
+Route::get('register/billing', [RegisteredUserController::class, 'showBilling'])
+    ->name('register.billing');
+
+Route::post('register/billing', [RegisteredUserController::class, 'completeBilling'])
+    ->name('register.billing.store');
+
 Route::middleware('guest')->group(function () {
-    Route::get('register', [RegisteredUserController::class, 'create'])
-        ->name('register');
-
-    Route::post('register', [RegisteredUserController::class, 'store'])
-        ->name('register.store');
-
-    Route::get('register/billing', [RegisteredUserController::class, 'showBilling'])
-        ->name('register.billing');
-
-    Route::post('register/billing', [RegisteredUserController::class, 'completeBilling'])
-        ->name('register.billing.store');
-
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
@@ -47,6 +47,11 @@ Route::get('login', [AuthenticatedSessionController::class, 'create'])
 // replace stale authenticated sessions on the destination host.
 Route::get('auth/handoff', [AuthenticatedSessionController::class, 'handoff'])
     ->name('auth.handoff');
+
+// Used by the central login page to explicitly clear the previous tenant-host
+// session when a user manually switches from a workspace host to nsync.localhost.
+Route::get('auth/host-logout', [AuthenticatedSessionController::class, 'hostLogout'])
+    ->name('auth.host-logout');
 
 Route::middleware('auth')->group(function () {
     Route::get('verify-email', EmailVerificationPromptController::class)

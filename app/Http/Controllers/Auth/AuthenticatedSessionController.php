@@ -20,8 +20,16 @@ class AuthenticatedSessionController extends Controller
     {
         $host = strtolower(request()->getHost());
         $isLocalhost = in_array($host, ['localhost', '127.0.0.1'], true);
+        $isCentralAdminHost = $host === 'nsync.localhost';
 
-        if ($isLocalhost && Auth::check()) {
+        if (($isLocalhost || $isCentralAdminHost) && Auth::check()) {
+            $user = Auth::user();
+            $isPlatformAdmin = $user && ($user->email === 'admin@nsync.com' || $user->hasRole('Platform Administrator'));
+
+            if ($isCentralAdminHost && $isPlatformAdmin) {
+                return redirect()->to($this->loginDestination($user));
+            }
+
             Auth::guard('web')->logout();
             request()->session()->invalidate();
             request()->session()->regenerateToken();
@@ -31,7 +39,9 @@ class AuthenticatedSessionController extends Controller
             return redirect()->to($this->loginDestination(Auth::user()));
         }
 
-        return view('auth.login');
+        return view('auth.login', [
+            'logoutHostUrl' => $isCentralAdminHost ? $this->crossHostLogoutUrl(request()) : null,
+        ]);
     }
 
     /**
@@ -61,7 +71,7 @@ class AuthenticatedSessionController extends Controller
     {
         $token = $request->query('token');
         if (!$token || !is_string($token)) {
-            return redirect()->route('login')->withErrors([
+            return redirect()->to(route('login', absolute: false))->withErrors([
                 'email' => 'Login session expired. Please sign in again.',
             ]);
         }
@@ -69,14 +79,14 @@ class AuthenticatedSessionController extends Controller
         try {
             $payload = json_decode(Crypt::decryptString($token), true, flags: JSON_THROW_ON_ERROR);
         } catch (\Throwable) {
-            return redirect()->route('login')->withErrors([
+            return redirect()->to(route('login', absolute: false))->withErrors([
                 'email' => 'Login session expired. Please sign in again.',
             ]);
         }
 
         $expiresAt = (int) ($payload['exp'] ?? 0);
         if ($expiresAt <= now()->timestamp) {
-            return redirect()->route('login')->withErrors([
+            return redirect()->to(route('login', absolute: false))->withErrors([
                 'email' => 'Login session expired. Please sign in again.',
             ]);
         }
@@ -84,14 +94,14 @@ class AuthenticatedSessionController extends Controller
         $expectedHost = strtolower($payload['host'] ?? '');
         $actualHost = strtolower($request->getHost());
         if (!$expectedHost || $expectedHost !== $actualHost) {
-            return redirect()->route('login')->withErrors([
+            return redirect()->to(route('login', absolute: false))->withErrors([
                 'email' => 'Invalid organization login URL.',
             ]);
         }
 
         $userId = $payload['user_id'] ?? null;
         if (!$userId) {
-            return redirect()->route('login')->withErrors([
+            return redirect()->to(route('login', absolute: false))->withErrors([
                 'email' => 'Login session is invalid. Please sign in again.',
             ]);
         }
@@ -114,8 +124,20 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        // Redirect to root, which will automatically trigger the login redirect
-        return redirect('/');
+        // Redirect to the central app URL so tenant logout returns to localhost
+        return redirect()->to(rtrim(config('app.url'), '/'));
+    }
+
+    public function hostLogout(Request $request)
+    {
+        if (Auth::check()) {
+            Auth::guard('web')->logout();
+        }
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return response()->noContent();
     }
 
     /**
@@ -162,7 +184,7 @@ class AuthenticatedSessionController extends Controller
             return $this->tenantUrl($tenant->domain);
         }
 
-        return route('pending-approval');
+        return route('landing', absolute: false);
     }
 
     private function createHandoffUrl(User $user, string $destination): string
@@ -191,5 +213,23 @@ class AuthenticatedSessionController extends Controller
     private function hostForUrl(string $url): string
     {
         return strtolower((string) parse_url($url, PHP_URL_HOST));
+    }
+
+    private function crossHostLogoutUrl(Request $request): ?string
+    {
+        $referer = (string) $request->headers->get('referer', '');
+        if ($referer === '') {
+            return null;
+        }
+
+        $refererHost = strtolower((string) parse_url($referer, PHP_URL_HOST));
+        if ($refererHost === '' || in_array($refererHost, ['localhost', '127.0.0.1', 'nsync.localhost'], true)) {
+            return null;
+        }
+
+        $port = parse_url(config('app.url'), PHP_URL_PORT) ?: $request->getPort() ?: 8000;
+        $portSegment = $port && $port !== 80 && $port !== 443 ? ':' . $port : '';
+
+        return "http://{$refererHost}{$portSegment}/auth/host-logout";
     }
 }

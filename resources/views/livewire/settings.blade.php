@@ -36,10 +36,13 @@ new class extends Component {
         $releases = collect($releaseService->releases(5));
         $tenant = app()->bound('currentTenant') ? app('currentTenant') : null;
 
+        $appliedVersion = $tenant?->applied_release_version;
+
         return [
             'latestRelease' => $releases->first(),
             'latestVersion' => $releaseService->latestVersion(),
-            'appliedVersion' => (string) ($tenant?->applied_release_version ?: $releaseService->latestVersion()),
+            'appliedVersion' => $appliedVersion,
+            'appliedVersionDisplay' => $appliedVersion ?: 'Not applied',
             'releases' => $releases,
         ];
     }
@@ -271,7 +274,7 @@ new class extends Component {
                 <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <h2 class="text-2xl font-bold text-gray-900">Updates</h2>
-                        <p class="text-gray-600 text-base mt-2">Applied NSync release: <span class="font-bold text-gray-900">{{ $appliedVersion }}</span></p>
+                        <p class="text-gray-600 text-base mt-2">Applied NSync release: <span class="font-bold text-gray-900">{{ $appliedVersionDisplay }}</span></p>
                     </div>
                     <a href="{{ route('update-center') }}" class="inline-flex rounded-lg bg-nsync-green-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-nsync-green-700">
                         Open Update Center
@@ -509,19 +512,19 @@ new class extends Component {
                     <div class="space-y-6">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Current Password</label>
-                            <input type="password" wire:model="current_password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-nsync-green-500 focus:border-transparent transition text-base" placeholder="Enter current password" />
+                            <x-password-input wire:model="current_password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-nsync-green-500 focus:border-transparent transition text-base" placeholder="Enter current password" />
                             @error('current_password') <span class="text-red-600 text-xs mt-1">{{ $message }}</span> @enderror
                         </div>
 
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">New Password</label>
-                            <input type="password" wire:model="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-nsync-green-500 focus:border-transparent transition text-base" placeholder="Enter new password" />
+                            <x-password-input wire:model="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-nsync-green-500 focus:border-transparent transition text-base" placeholder="Enter new password" />
                             @error('password') <span class="text-red-600 text-xs mt-1">{{ $message }}</span> @enderror
                         </div>
 
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Confirm Password</label>
-                            <input type="password" wire:model="password_confirmation" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-nsync-green-500 focus:border-transparent transition text-base" placeholder="Confirm new password" />
+                            <x-password-input wire:model="password_confirmation" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-nsync-green-500 focus:border-transparent transition text-base" placeholder="Confirm new password" />
                         </div>
 
                         <button wire:click="updatePassword" class="px-6 py-2 bg-nsync-green-600 text-white font-medium rounded-lg hover:bg-nsync-green-700 transition">Update Password</button>
@@ -560,7 +563,7 @@ new class extends Component {
                 </div>
 
                 <div class="mb-6">
-                    <input type="password" wire:model="current_password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm" placeholder="Enter your password" />
+                    <x-password-input wire:model="current_password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm" placeholder="Enter your password" />
                 </div>
 
                 <div class="flex gap-3">

@@ -44,19 +44,19 @@
 
                     <div class="space-y-2">
                         <label class="block text-sm font-semibold text-gray-700">Current password</label>
-                        <input type="password" name="current_password" autocomplete="current-password" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500" placeholder="••••••••">
+                        <x-password-input name="current_password" autocomplete="current-password" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500" placeholder="Current password" />
                         @error('current_password') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div class="space-y-2">
                             <label class="block text-sm font-semibold text-gray-700">New password</label>
-                            <input type="password" name="new_password" autocomplete="new-password" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500" placeholder="At least 8 characters">
+                            <x-password-input name="new_password" autocomplete="new-password" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500" placeholder="At least 8 characters" />
                             @error('new_password') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div class="space-y-2">
                             <label class="block text-sm font-semibold text-gray-700">Confirm password</label>
-                            <input type="password" name="new_password_confirmation" autocomplete="new-password" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500" placeholder="Repeat new password">
+                            <x-password-input name="new_password_confirmation" autocomplete="new-password" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500" placeholder="Repeat new password" />
                         </div>
                     </div>
 

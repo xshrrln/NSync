@@ -202,8 +202,8 @@ new class extends Component {
 
                         <div>
                             <div class="mb-2 flex items-center justify-between text-sm">
-                                <span class="text-slate-600">Storage</span>
-                                <span class="font-semibold text-slate-900">{{ number_format($tenant->storage_used, 1) }} MB / {{ $storageLimit >= 999999 ? 'Unlimited' : number_format($storageLimit ?? 0) . ' MB' }}</span>
+                                <span class="text-slate-600">Workspace Size</span>
+                                <span class="font-semibold text-slate-900">{{ number_format($tenant->storage_used_kb, 1) }} KB / {{ $storageLimit >= 999999 ? 'Unlimited' : number_format(($storageLimit ?? 0) * 1024) . ' KB' }}</span>
                             </div>
                             @if(($storageLimit ?? 0) > 0 && $storageLimit < 999999)
                                 <div class="h-2 rounded-full bg-slate-100">

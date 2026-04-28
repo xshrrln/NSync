@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Casts\LenientEncrypted;
+use App\Casts\LenientEncryptedArray;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 use Spatie\Multitenancy\Models\Concerns\UsesTenantConnection;
@@ -19,12 +21,12 @@ class Task extends Model
     protected $fillable = ['tenant_id', 'title', 'description', 'assignees', 'labels', 'due_date', 'attachments', 'checklists', 'stage_id', 'board_id', 'user_id', 'position'];
 
     protected $casts = [
-        'title' => 'encrypted',
-        'description' => 'encrypted',
-        'assignees' => 'encrypted:array',
-        'labels' => 'encrypted:array',
-        'attachments' => 'encrypted:array',
-        'checklists' => 'encrypted:array',
+        'title' => LenientEncrypted::class,
+        'description' => LenientEncrypted::class,
+        'assignees' => LenientEncryptedArray::class,
+        'labels' => LenientEncryptedArray::class,
+        'attachments' => LenientEncryptedArray::class,
+        'checklists' => LenientEncryptedArray::class,
         'due_date' => 'date',
     ];
 

@@ -43,7 +43,7 @@ text-base font-medium">{{ $tenant->member_count }} members</td>
 
 <xai:function_call name="edit_file">
 <parameter name="path">resources/views/components/admin/⚡tenant-approval.blade.php
-        <td class="p-4 text-sm text-gray-500">{{ number_format($tenant->storage_used, 1) }} MB</td>
+        <td class="p-4 text-sm text-gray-500">{{ number_format($tenant->storage_used_kb, 1) }} KB</td>
         <td class="p-4 text-sm font-medium">{{ $tenant->plan }}</td>
         <td class="p-4 text-right">
             <form method="POST" action="{{ route('admin.tenants.approve', $tenant) }}" class="inline">
@@ -91,4 +91,3 @@ text-base font-medium">{{ $tenant->member_count }} members</td>
         @endif
     </div>
 </div>
-

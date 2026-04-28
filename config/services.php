@@ -44,9 +44,20 @@ return [
             'repository' => env('GITHUB_RELEASE_REPOSITORY', 'xshrrln/NSync'),
             'token' => env('GITHUB_RELEASE_TOKEN'),
             'cache_minutes' => env('GITHUB_RELEASE_CACHE_MINUTES', 10),
-            'timeout' => env('GITHUB_RELEASE_TIMEOUT', 5),
+            'timeout' => env('GITHUB_RELEASE_TIMEOUT', 12),
             'fallback_version' => env('APP_VERSION', 'v0.0.0'),
         ],
+    ],
+
+    'openai' => [
+        'key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_SUPPORT_MODEL', 'gpt-5.4-mini'),
+        'timeout' => env('OPENAI_SUPPORT_TIMEOUT', 12),
+    ],
+
+    'support_ai' => [
+        'enabled' => env('SUPPORT_AI_ENABLED', false),
+        'assistant_name' => env('SUPPORT_AI_ASSISTANT_NAME', 'NSync Assistant'),
     ],
 
     'slack' => [
